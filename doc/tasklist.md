@@ -1,195 +1,136 @@
-# План разработки LLM-консультанта
+# Development Task List
 
-*Итерационная разработка с тестируемыми шагами согласно @vision.md*
+*Iterative development plan for Funny Recipe Bot following @vision.md and @conventions.md*
 
-## 📊 Прогресс проекта
+## Progress Report
 
-**Текущий статус:** Не начато  
-**Завершенных итераций:** 0/8  
-**Дата последнего обновления:** -
+**Current Status:** Iteration 1 Complete  
+**Last Updated:** September 10, 2025  
+**Completed Iterations:** 1/7  
+**Next Step:** LLM Integration  
 
-### Статистика по итерациям:
-- [ ] **Итерация 1:** Базовая настройка - 0%
-- [ ] **Итерация 2:** Эхо-бот - 0%  
-- [ ] **Итерация 3:** LLM интеграция - 0%
-- [ ] **Итерация 4:** Контекст диалога - 0%
-- [ ] **Итерация 5:** Системный промпт - 0%
-- [ ] **Итерация 6:** Мониторинг - 0%
-- [ ] **Итерация 7:** Docker деплой - 0%
-- [ ] **Итерация 8:** Финализация - 0%
+### Completion Summary:
+- [x] Iterations completed: 1
+- [ ] Core functionality working: No
+- [ ] Ready for user testing: No
 
 ---
 
-## 🚀 Итерационный план разработки
+## Iterative Development Plan
 
-### Итерация 1: Базовая настройка проекта
-*Цель: Настроить окружение и структуру проекта*
+### Iteration 1: Setup & Basic Bot
+**Goal:** Create minimal bot that responds to /start  
+**Test:** Bot connects to Telegram and responds with hello message
 
-**Файлы для создания:**
-- [ ] `pyproject.toml` - конфигурация uv и зависимости
-- [ ] `.env.example` - шаблон переменных окружения  
-- [ ] `.gitignore` - исключения Git
-- [ ] `config.py` - загрузка переменных окружения
-- [ ] `main.py` - пустая заготовка точки входа
-- [ ] `bot/__init__.py` - инициализация модуля bot
-- [ ] `llm/__init__.py` - инициализация модуля llm
+- [x] Create project structure per @vision.md
+  - [x] `main.py` - bot startup and polling
+  - [x] `config.py` - environment variables
+  - [x] `handlers.py` - message handlers
+  - [x] `pyproject.toml` - uv dependencies
+- [x] Setup environment configuration
+  - [x] Basic config validation in `config.py`
+- [x] Implement basic Telegram bot
+  - [x] aiogram 3.x integration in `main.py`
+  - [x] Simple /start handler in `handlers.py`
+- [x] Test: Dependencies install and imports work correctly
 
-**Тестирование:**
-- [ ] `uv sync` успешно устанавливает зависимости
-- [ ] `python main.py` запускается без ошибок
-- [ ] Переменные окружения корректно загружаются из .env
+### Iteration 2: LLM Integration
+**Goal:** Connect to OpenRouter API for basic LLM responses  
+**Test:** Bot can generate simple text responses using LLM
 
-### Итерация 2: Простой эхо-бот
-*Цель: Базовая работа с Telegram API*
+- [ ] Create `llm_client.py` per @vision.md
+  - [ ] OpenRouter API integration via openai client
+  - [ ] Basic error handling for LLM failures
+  - [ ] Simple logging for token usage
+- [ ] Implement basic LLM conversation
+  - [ ] Any user message → LLM → response flow
+  - [ ] No system prompt yet (just echo-style responses)
+- [ ] Test: Send any message, get LLM-generated response
 
-**Файлы для реализации:**
-- [ ] `bot/handlers.py` - обработчик эхо-сообщений
-- [ ] `main.py` - инициализация aiogram и запуск polling
-- [ ] `.env` - добавить TELEGRAM_TOKEN
+### Iteration 3: System Prompt & Recipe Context
+**Goal:** Add recipe-focused system prompt from @product_idea.md  
+**Test:** Bot behaves like a recipe assistant, not generic chatbot
 
-**Функциональность:**
-- [ ] Бот отвечает на команду `/start` приветствием
-- [ ] Бот повторяет любое текстовое сообщение пользователя
-- [ ] Корректная обработка ошибок Telegram API
+- [ ] Implement system prompt in `llm_client.py`
+  - [ ] Full system prompt from @product_idea.md
+  - [ ] Recipe-focused personality and rules
+- [ ] Update response handling
+  - [ ] System prompt prepended to all conversations
+  - [ ] Focus on ingredient gathering and recipe generation
+- [ ] Test: Ask about ingredients, get recipe-focused questions back
 
-**Тестирование:**
-- [ ] Бот запускается и подключается к Telegram
-- [ ] Отвечает на `/start`
-- [ ] Повторяет отправленные сообщения
+### Iteration 4: Conversation Memory
+**Goal:** Add in-memory conversation history per chat_id  
+**Test:** Bot remembers previous messages in same conversation
 
-### Итерация 3: Интеграция с LLM
-*Цель: Первый вызов OpenRouter API*
+- [ ] Implement conversation storage in `handlers.py`
+  - [ ] In-memory dict: `conversations[chat_id] = list[dict]`
+  - [ ] Store last 20 relevant messages per @vision.md
+- [ ] Update LLM integration
+  - [ ] Pass full conversation history to LLM
+  - [ ] Auto-trim old messages when limit exceeded
+- [ ] Test: Multi-message conversation with context memory
 
-**Файлы для реализации:**
-- [ ] `llm/client.py` - базовый клиент OpenRouter API
-- [ ] `config.py` - добавить LLM настройки
-- [ ] `bot/handlers.py` - замена эхо на LLM ответы
+### Iteration 5: Recipe Generation
+**Goal:** Generate actual funny recipes with proper formatting  
+**Test:** Bot creates complete recipes with names, ingredients, steps
 
-**Функциональность:**
-- [ ] Простой вызов LLM для генерации ответа
-- [ ] Обработка ошибок API (таймауты, неверный ключ)
-- [ ] Базовая обработка длинных ответов (разбивка сообщений)
+- [ ] Enhance system prompt for recipe output
+  - [ ] Recipe format specification from @product_idea.md
+  - [ ] Funny names, surprising combinations, simple steps
+- [ ] Test comprehensive recipe scenarios
+  - [ ] Input: "I have chicken and chocolate"
+  - [ ] Output: Complete formatted funny recipe
+- [ ] Test: Various ingredient combinations produce creative recipes
 
-**Тестирование:**
-- [ ] Бот генерирует ответы через LLM
-- [ ] Корректно обрабатывает ошибки API
-- [ ] Длинные ответы разбиваются на части
+### Iteration 6: Enhanced Personality & Variations
+**Goal:** Add bot personality and proactive recipe variations  
+**Test:** Bot offers multiple recipe options and cultural context
 
-### Итерация 4: Контекст диалога
-*Цель: Сохранение истории разговора*
+- [ ] Implement enhanced personality from @vision.md
+  - [ ] Emoji-rich responses with cultural context
+  - [ ] Historical/cultural recipe backgrounds
+  - [ ] Proactive variation suggestions
+- [ ] Add recipe complexity handling
+  - [ ] 3-7 steps based on user confidence
+  - [ ] Cooking skill level awareness
+- [ ] Test: Bot provides recipe variations and cultural stories
 
-**Файлы для доработки:**
-- [ ] `bot/handlers.py` - добавить хранение контекста
-- [ ] `config.py` - лимиты контекста (MAX_DIALOG_MESSAGES, MAX_CONTEXT_TOKENS)
-- [ ] `llm/client.py` - передача массива сообщений
+### Iteration 7: Docker Deployment & Final Polish
+**Goal:** Production-ready deployment with Docker  
+**Test:** Bot runs in Docker container and handles real user load
 
-**Функциональность:**
-- [ ] Глобальное хранение контекста по chat_id
-- [ ] Автоматическое ограничение истории (FIFO)
-- [ ] Передача полного контекста в LLM
-
-**Тестирование:**
-- [ ] Бот помнит предыдущие сообщения в диалоге
-- [ ] Контекст корректно ограничивается при превышении лимитов
-- [ ] Каждый chat_id имеет независимый контекст
-
-### Итерация 5: Системный промпт и роль консультанта
-*Цель: Превратить бота в консультанта компании*
-
-**Файлы для доработки:**
-- [ ] `config.py` - добавить SYSTEM_PROMPT и COMPANY_INFO
-- [ ] `bot/handlers.py` - инициализация контекста с system prompt
-- [ ] `llm/client.py` - настройка температуры и токенов
-
-**Функциональность:**
-- [ ] Системный промпт всегда первое сообщение
-- [ ] Бот ведет себя как консультант компании
-- [ ] Задает уточняющие вопросы по одному
-- [ ] Рекомендует услуги на основе потребностей
-
-**Тестирование:**
-- [ ] Бот представляется как консультант при `/start`
-- [ ] Задает релевантные вопросы о потребностях
-- [ ] Предлагает услуги компании
-
-### Итерация 6: Мониторинг и логирование
-*Цель: Отслеживание работы и ошибок*
-
-**Файлы для доработки:**
-- [ ] `main.py` - настройка базового логгирования
-- [ ] `bot/handlers.py` - логгирование сообщений пользователей
-- [ ] `llm/client.py` - логгирование метрик LLM (токены, время, ошибки)
-- [ ] `logs/` - создать директорию для логов
-
-**Функциональность:**
-- [ ] Логгирование в файл и консоль
-- [ ] Метрики использования LLM (токены, стоимость, время)
-- [ ] Логгирование ошибок с контекстом
-- [ ] Простая ротация логов
-
-**Тестирование:**
-- [ ] Логи записываются в файл `logs/app.log`
-- [ ] LLM метрики отслеживаются корректно
-- [ ] Ошибки логгируются с достаточным контекстом
-
-### Итерация 7: Docker деплой
-*Цель: Контейнеризация для простого запуска*
-
-**Файлы для создания:**
-- [ ] `Dockerfile` - образ приложения
-- [ ] `docker-compose.yml` - локальное развертывание  
-- [ ] `Makefile` - команды для управления
-- [ ] `.dockerignore` - исключения для сборки
-
-**Функциональность:**
-- [ ] Собираемый Docker образ
-- [ ] Запуск через docker-compose
-- [ ] Автоматический перезапуск при сбоях
-- [ ] Проброс логов
-
-**Тестирование:**
-- [ ] `make build` успешно собирает образ
-- [ ] `make run` запускает бота в контейнере
-- [ ] `make logs` показывает логи бота
-- [ ] Бот работает стабильно в контейнере
-
-### Итерация 8: Финализация и полировка
-*Цель: Подготовка к продакшену*
-
-**Файлы для доработки:**
-- [ ] `README.md` - инструкции по установке и запуску
-- [ ] `config.py` - валидация обязательных переменных  
-- [ ] `bot/handlers.py` - улучшение обработки edge cases
-- [ ] Все модули - код ревью и рефакторинг
-
-**Функциональность:**
-- [ ] Валидация конфигурации при старте
-- [ ] Graceful shutdown бота
-- [ ] Обработка агрессивных/неясных сообщений
-- [ ] Готовая документация для деплоя
-
-**Тестирование:**
-- [ ] Полное end-to-end тестирование всех сценариев
-- [ ] Нагрузочное тестирование (несколько пользователей)
-- [ ] Проверка работы без интернета/API
-- [ ] Документация позволяет развернуть проект с нуля
+- [ ] Create Docker configuration
+  - [ ] `Dockerfile` per @vision.md
+  - [ ] `docker-compose.yml` with logging volume
+  - [ ] `Makefile` for deployment automation
+- [ ] Add logging infrastructure
+  - [ ] Rotating file handler
+  - [ ] Console output for Docker logs
+- [ ] Final testing & documentation
+  - [ ] End-to-end user journey testing
+  - [ ] Update README.md with deployment instructions
+- [ ] Test: Full deployment in Docker with log monitoring
 
 ---
 
-## 📋 Принципы разработки
+## File References
 
-Согласно @vision.md:
-- **KISS** - решаем только текущую задачу
-- **Функциональный подход** - без ООП, простые функции
-- **Быстрая итерация** - каждый шаг тестируем немедленно  
-- **MVP мышление** - только то, что проверяет гипотезу
+**Core Implementation:**
+- @vision.md - Complete technical architecture and design
+- @product_idea.md - System prompt and recipe requirements  
+- @conventions.md - Coding standards and KISS principles
 
-## 🔗 Связанные документы
+**Implementation Files** (to be created):
+- `main.py` - Bot startup and polling
+- `config.py` - Environment configuration  
+- `handlers.py` - Telegram message processing
+- `llm_client.py` - OpenRouter API integration
+- `pyproject.toml` - Dependencies via uv
 
-- **@vision.md** - техническое видение проекта
-- **@product_idea.md** - описание идеи продукта
-- **@conventions.md** - соглашения разработки
+**Testing Strategy:**
+Each iteration includes specific testable outcomes. Manual testing sufficient for MVP per @conventions.md - no complex test automation required initially.
 
 ---
 
-*Каждая итерация должна завершаться работающим ботом, готовым к тестированию пользователями.*
+*This plan follows KISS principles: each iteration builds working functionality, allows immediate testing, and adds single clear improvement.*

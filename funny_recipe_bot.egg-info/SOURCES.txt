@@ -1,0 +1,10 @@
+README.md
+config.py
+handlers.py
+main.py
+pyproject.toml
+funny_recipe_bot.egg-info/PKG-INFO
+funny_recipe_bot.egg-info/SOURCES.txt
+funny_recipe_bot.egg-info/dependency_links.txt
+funny_recipe_bot.egg-info/requires.txt
+funny_recipe_bot.egg-info/top_level.txt

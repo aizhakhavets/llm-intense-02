@@ -1,0 +1,17 @@
+[project]
+name = "funny-recipe-bot"
+version = "0.1.0"
+dependencies = [
+    "aiogram>=3.0.0",
+    "python-dotenv>=1.0.0"
+]
+
+[tool.setuptools]
+py-modules = ["main", "config", "handlers"]
+
+[tool.uv]
+dev-dependencies = []
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"

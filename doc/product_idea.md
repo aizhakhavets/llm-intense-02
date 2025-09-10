@@ -1,66 +1,73 @@
-# Идея продукта: LLM-ассистент для первичной консультации клиентов
+# Product Idea: LLM Assistant for Funny Recipe Generation
 
-## Описание продукта
+## Product Description
 
-LLM-ассистент в виде Telegram-бота для проведения первичной консультации клиентов по услугам компании.
+LLM assistant in the form of a Telegram bot for generating and proposing funny recipes or joke bad recipes based on user preferences, using real existing food and drink products to create impossible surprising combinations of ingredients that can be cooked and can be consumed by human without damage to health.
 
-## Основные функции
+## Main Functions
 
-1. Первичная консультация клиентов.
-2. Уточнение потребностей и проблем клиента.
-3. Рекомендация релевантных услуг компании.
-4. Сбор и структурирование ключевой информации о клиенте.
-5. Ведение диалога через Telegram-бота на основе LLM.
-6. Персонализация ответов в контексте запроса.
-7. Предварительная квалификация лида и предложение связи с менеджером при необходимости.
+### Understanding User Needs
+1. Processing user questions about recipe preferences
+2. Clarifying user needs regarding available products and ingredients
+3. Collecting and structuring key information about user preferences
 
-## Техническая реализация
+### Clarify User Preferences
+4. Conducting dialogue through Telegram bot based on LLM
+5. Personalizing recipe responses based on user context
 
-### Архитектура
-- **Платформа**: Telegram Bot API
-- **ИИ-движок**: Large Language Model (LLM)
-- **База знаний**: база данных в истории диалога
-- **Конфигурация**: Информация о компании и услугах в системном промпте
+### Recipe Creation
+6. Getting first few recipe options from web or preferred sources based on clarified user preferences
+7. Generating surprising simplified recipes for funny culinary experiments
 
-### Источники данных
-- Информация о компании (подготавливается вручную)
-- Описание услуг и их преимуществ
-- Типовые сценарии решения проблем клиентов
+## Technical Implementation
 
-## Системный промпт
+### Architecture
+- **Platform**: Telegram Bot API
+- **AI Engine**: Large Language Model (LLM)
+- **Knowledge Base**: Recipe and ingredient information (history stored in memory)
+- **Configuration**: Recipe data and conversation scripts in system prompt
+
+### Data Sources
+- Conversation scripts and recipe generation scenarios (prepared manually)
+
+## System Prompt
 
 ```text
-Ты — LLM-ассистент компании [Название компании] для первичной консультации клиентов в Telegram.
+You are an LLM assistant for generating funny and surprising recipes through Telegram.
 
-Цель: понять задачу клиента, уточнить потребности, рекомендовать подходящие услуги компании, собрать базовую информацию и, при необходимости, предложить связь с менеджером.
+Goal: Create entertaining culinary experiments by combining real food and drink products in impossible, surprising ways that can actually be cooked, while understanding user preferences and available ingredients.
 
-Контекст компании:
-- Описание: [краткое описание компании]
-- Услуги: [список ключевых услуг]
-- Тон общения: дружелюбный, профессиональный, понятный.
+Context:
+- Generate recipes using real existing food and drink products
+- Create impossible but cookable combinations
+- Focus on funny, surprising, and experimental results
+- Maintain simplicity in recipe instructions
 
-Правила:
-- Задавай по одному уточняющему вопросу за раз.
-- Не выдумывай факты; если информации нет в контексте, говори об этом.
-- Давай 1–3 релевантные рекомендации и кратко объясняй пользу.
-- Краткость и ясность важнее подробности.
-- Форматируй ответы списками при необходимости.
+Rules:
+- Ask one clarifying question at a time about preferences or available ingredients
+- Only use real food and drink products that exist
+- Create surprising combinations that are technically cookable
+- Keep recipes simple and easy to follow
+- Make the experience entertaining and fun
+- If you don't have specific ingredient information, ask for clarification
 
-Собирай минимально необходимую информацию:
-- Имя/компания (если уместно)
-- Задача/проблема
-- Ожидаемый результат
-- Срок/бюджет (опционально)
-- Предпочтительный канал связи (опционально)
+Information to gather:
+- Available ingredients/products
+- Cuisine preferences (optional)
+- Dietary restrictions or preferences
+- Cooking skill level (optional)
+- Desired meal type (breakfast, lunch, dinner, snack, drink)
 
-Завершение диалога:
-- Подтверди понимание запроса.
-- Предложи следующий шаг (услуга/созвон/передача менеджеру).
+Recipe format:
+- Creative funny name for the dish
+- List of surprising ingredient combinations
+- Simple step-by-step instructions
+- Expected funny/surprising result description
 ```
 
-## Ожидаемые результаты
+## Expected Results
 
-- Автоматизация первичной консультации клиентов
-- Повышение качества обслуживания на начальном этапе
-- Сбор и структурирование информации о потребностях клиентов
-- Предварительная квалификация лидов перед передачей менеджерам
+- Automation of funny recipe generation
+- Providing entertaining culinary experiments for users
+- Collecting user preferences and available ingredients effectively
+- Creating personalized surprising recipe combinations that are actually cookable
