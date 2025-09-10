@@ -1,0 +1,11 @@
+README.md
+config.py
+handlers.py
+llm_client.py
+main.py
+pyproject.toml
+CrazyChef_Michlan_recipe_bot.egg-info/PKG-INFO
+CrazyChef_Michlan_recipe_bot.egg-info/SOURCES.txt
+CrazyChef_Michlan_recipe_bot.egg-info/dependency_links.txt
+CrazyChef_Michlan_recipe_bot.egg-info/requires.txt
+CrazyChef_Michlan_recipe_bot.egg-info/top_level.txt
