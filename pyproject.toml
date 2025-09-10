@@ -1,5 +1,5 @@
 [project]
-name = "funny-recipe-bot"
+name = "CrazyChef_Michlan-recipe-bot"
 version = "0.1.0"
 dependencies = [
     "aiogram>=3.0.0",
