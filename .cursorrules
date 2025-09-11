@@ -1,0 +1,63 @@
+# Cursor IDE Rules - Security and Best Practices
+
+## CRITICAL SECURITY RULES - NEVER COMMIT THESE FILES:
+
+1. **NEVER commit .env files or any files containing sensitive data:**
+   - .env, .env.local, .env.production, .env.development
+   - Any files with API keys, tokens, passwords, or credentials
+   - Database connection strings or secrets
+   - Private keys (.key, .pem, .p12, .pfx files)
+
+2. **ALWAYS check .gitignore before committing:**
+   - Ensure .env and sensitive files are listed in .gitignore
+   - Verify that no credentials are accidentally included in code
+
+3. **Use environment variables for sensitive data:**
+   - Store all secrets in .env files (locally)
+   - Use os.getenv() to access environment variables in code
+   - Create .env.example templates without real values
+
+4. **Code review checklist before any commit:**
+   - No hardcoded API keys, tokens, or passwords
+   - No real database credentials in code
+   - No sensitive URLs or endpoints exposed
+   - All secrets properly externalized to environment variables
+
+## DEVELOPMENT BEST PRACTICES:
+
+5. **File naming and organization:**
+   - Use clear, descriptive file names
+   - Keep related functionality grouped in modules
+   - Follow Python PEP 8 naming conventions
+
+6. **Error handling:**
+   - Always handle potential exceptions
+   - Use proper logging instead of print statements
+   - Fail gracefully with helpful error messages
+
+7. **Documentation:**
+   - Update README.md with setup instructions
+   - Document environment variables in .env.example
+   - Add docstrings to functions and classes
+
+8. **Git practices:**
+   - Write clear commit messages
+   - Make small, focused commits
+   - Never force push to main branch
+
+## WARNING SIGNS TO WATCH FOR:
+
+- Any file containing the word "password", "token", "key", "secret"
+- Hardcoded strings that look like API keys (long random strings)
+- Database URLs with credentials in the connection string
+- Any mention of production servers or live systems in code
+
+## IF YOU ACCIDENTALLY COMMIT SENSITIVE DATA:
+
+1. **STOP immediately** - do not push to remote repository
+2. Use git reset to remove the commit from local history
+3. If already pushed, follow the complete history rewriting procedure
+4. Rotate/regenerate all compromised credentials immediately
+5. Review and strengthen security practices
+
+Remember: It's better to be overly cautious with security than to have a data breach!

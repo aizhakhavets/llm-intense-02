@@ -2,9 +2,12 @@ import openai
 import logging
 import time
 from config import OPENROUTER_API_KEY, OPENROUTER_MODEL, LLM_TEMPERATURE, LLM_MAX_TOKENS
+from ingredient_intelligence import select_surprise_ingredients, get_cultural_context, has_local_ingredients
 
-# Enhanced personality system prompt with cultural context and proactive variations
-SYSTEM_PROMPT = """You are a joyful, culturally-aware recipe wizard for Telegram who creates entertaining culinary experiments rooted in ancient fusion traditions! 🌟✨
+def build_dynamic_system_prompt(user_profile: dict = None, local_ingredients: list = None) -> str:
+    """Build system prompt with user context and local ingredients"""
+    
+    base_prompt = """You are a joyful, culturally-aware recipe wizard for Telegram who creates entertaining culinary experiments rooted in ancient fusion traditions! 🌟✨
 
 PERSONALITY TRAITS:
 🎭 Joyful, emoji-rich but never childish - professional advice wrapped in playful presentation
@@ -13,25 +16,37 @@ PERSONALITY TRAITS:
 🌍 Draw from global, lesser-known cuisine combinations and historical food exchanges
 💫 Proactively offer creative variations with humor after each recipe
 🎪 Use cultural commentary with playful humor ("because the French can't resist improving everyone's recipes!")
+"""
+    
+    # Add current user context
+    if user_profile:
+        base_prompt += "\n\nCURRENT USER CONTEXT:\n"
+        
+        if user_profile.get('location'):
+            location = user_profile['location']
+            cultural_context = get_cultural_context(location)
+            base_prompt += f"🌍 User location: {location} ({cultural_context})\n"
+            
+        if user_profile.get('ingredients'):
+            base_prompt += f"🥘 User ingredients: {user_profile['ingredients']}\n"
+            
+        if local_ingredients:
+            base_prompt += f"✨ Local surprise ingredients to include: {', '.join(local_ingredients)}\n"
+            
+        if user_profile.get('mood'):
+            base_prompt += f"🎭 User mood: {user_profile['mood']}\n"
+            
+        if user_profile.get('skill_level'):
+            base_prompt += f"👨‍🍳 Cooking skill level: {user_profile['skill_level']}\n"
+    
+    base_prompt += """
 
-RECIPE BEHAVIOR:
-- Always ask about cooking confidence: "kitchen ninja or cautious experimenter?"
-- IMPORTANT to make it SURPRISING for the user
-- Generate 3-4 steps, keep is useful and short (1-2 sentences per step) and joke/funny
-- Add surprising ingredient based on user country location
-- Include cultural/historical context: "This dish would've impressed Suleiman himself!"
-- Use storytelling: "Ancient Silk Road traders would recognize these flavor combinations"
-- Add sensory descriptions: "tastes like a sunset over Constantinople"
-
-INFORMATION TO GATHER:
-- Always gather information: run conversation first in 3-4 iterations, ask questions
-- collect information about user into context for LLM
-- Available ingredients/products
-- Person location / country
-- Mood today (adventurous, nostalgic, comfort-seeking)
-- Cooking confidence level (affects recipe complexity)
-- Cuisine preferences and cultural interests
-
+RECIPE GENERATION TASK:
+- Create ONE surprising recipe using user ingredients + local surprise ingredients
+- IMPORTANT: Make it VERY SURPRISING but technically cookable
+- Generate 3-5 steps based on skill level (simpler for beginners)
+- Include cultural/historical context and storytelling
+- Add sensory descriptions with cultural metaphors
 
 RECIPE FORMAT:
 # [Creative Name] ([Historical-Context]) 🏺✨
@@ -39,37 +54,49 @@ RECIPE FORMAT:
 **The Story:** [Brief cultural/historical background that inspired the dish]
 
 **Ingredients:**
-- [List with cultural notes where relevant]
-- [Use real existing products]
-- [new/surprising ingredient based on user country location]
+- [User's original ingredients]
+- [Local surprise ingredients with cultural notes]
+- [Any additional needed ingredients]
 
 **Steps:**
-1. [Cultural cooking technique reference] - [instruction]
-2. [Continue with 3-4 total steps]
+1. [Cultural cooking technique reference] - [clear instruction with humor]
+2. [Continue with 3-5 total steps based on skill level]
 3. [Include sensory cues and cooking wisdom]
 
 **Result:** [Sensory description with cultural metaphors and surprising taste profile]
 
 MANDATORY PROACTIVE VARIATIONS:
-Before to get to the recipe, run conversation in 3-4 iterations, 
-ask questions and gather information about user, location, ingredients, mood, 
-other details to make SURPRISE
 After EVERY recipe, offer 2-3 humorous variations:
 
 **Plot twist time! 🎭 Want to shake things up even more?**
 
 🌊 **[Regional] Version**: [adaptation with regional twist and humor]
-🌮 **[Culture] Revenge**: [historical timeline twist with playful commentary]
+🌮 **[Culture] Revenge**: [historical timeline twist with playful commentary] 
 🍷 **[Culture] Rebellion**: [cultural adaptation with witty observation]
 
 Which timeline calls to you? Or shall we explore completely different cosmic combinations? ✨
 
-This creates an entertaining, educational experience that celebrates global culinary heritage while making cooking fun and accessible!"""
+Generate the complete recipe now!"""
+    
+    return base_prompt
 
-def generate_response(chat_messages: list[dict]) -> str:
-    """Generate response using full conversation history"""
+async def generate_recipe_with_local_ingredients(chat_id: int, user_profile: dict) -> str:
+    """Generate recipe using user profile and local ingredient intelligence"""
     
     start_time = time.time()
+    
+    # Get user ingredients and location
+    user_ingredients_str = user_profile.get('ingredients', '')
+    user_location = user_profile.get('location', '')
+    
+    # Parse user ingredients into list
+    user_ingredients = [ing.strip() for ing in user_ingredients_str.replace(',', ' ').split() if ing.strip()]
+    
+    # Select local surprise ingredients
+    local_ingredients = select_surprise_ingredients(user_location, user_ingredients, count=2)
+    
+    # Build dynamic system prompt with context
+    system_prompt = build_dynamic_system_prompt(user_profile, local_ingredients)
     
     client = openai.Client(
         api_key=OPENROUTER_API_KEY,
@@ -77,25 +104,5 @@ def generate_response(chat_messages: list[dict]) -> str:
     )
     
     try:
-        # Prepare messages: system prompt + chat history
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT}
-        ] + chat_messages
-        
-        response = client.chat.completions.create(
-            model=OPENROUTER_MODEL,
-            messages=messages,
-            temperature=LLM_TEMPERATURE,
-            max_tokens=LLM_MAX_TOKENS
-        )
-        
-        duration = time.time() - start_time
-        tokens = response.usage.total_tokens if response.usage else 0
-        estimated_cost = (tokens * 0.75) / 1_000_000  # Rough estimate for claude-3.5-haiku
-        
-        logging.info(f"LLM_SUCCESS tokens={tokens} time={duration:.2f}s cost=${estimated_cost:.4f}")
-        return response.choices[0].message.content
-        
-    except Exception as e:
-        logging.error(f"LLM_ERROR: {e}")
-        return "Sorry, I'm having trouble generating responses right now. Please try again!"
+        # Create focused recipe generation message
+        recipe_request = f\"\"\"Create a surprising recipe combining:\n- User ingredients: {user_ingredients_str}\n- Local surprise ingredients: {', '.join(local_ingredients) if local_ingredients else 'none available'}\n\nMake it VERY surprising but cookable!\"\"\"\n        \n        messages = [\n            {\"role\": \"system\", \"content\": system_prompt},\n            {\"role\": \"user\", \"content\": recipe_request}\n        ]\n        \n        response = client.chat.completions.create(\n            model=OPENROUTER_MODEL,\n            messages=messages,\n            temperature=LLM_TEMPERATURE,\n            max_tokens=LLM_MAX_TOKENS\n        )\n        \n        duration = time.time() - start_time\n        tokens = response.usage.total_tokens if response.usage else 0\n        estimated_cost = (tokens * 0.75) / 1_000_000\n        \n        logging.info(f\"RECIPE_SUCCESS chat_id={chat_id} location={user_location} local_ingredients={len(local_ingredients)} tokens={tokens} time={duration:.2f}s cost=${estimated_cost:.4f}\")\n        return response.choices[0].message.content\n        \n    except Exception as e:\n        logging.error(f\"RECIPE_ERROR chat_id={chat_id}: {e}\")\n        return \"Sorry, I'm having trouble creating your culinary masterpiece right now. Please try again! \ud83d\ude05\u2728\"\n\ndef generate_response(chat_messages: list[dict], user_profile: dict = None) -> str:\n    \"\"\"Generate response using full conversation history (legacy function for compatibility)\"\"\" \n    \n    start_time = time.time()\n    \n    client = openai.Client(\n        api_key=OPENROUTER_API_KEY,\n        base_url=\"https://openrouter.ai/api/v1\"\n    )\n    \n    try:\n        # Use dynamic system prompt if profile available\n        if user_profile:\n            system_prompt = build_dynamic_system_prompt(user_profile)\n        else:\n            system_prompt = build_dynamic_system_prompt()\n            \n        # Prepare messages: system prompt + chat history\n        messages = [\n            {\"role\": \"system\", \"content\": system_prompt}\n        ] + chat_messages\n        \n        response = client.chat.completions.create(\n            model=OPENROUTER_MODEL,\n            messages=messages,\n            temperature=LLM_TEMPERATURE,\n            max_tokens=LLM_MAX_TOKENS\n        )\n        \n        duration = time.time() - start_time\n        tokens = response.usage.total_tokens if response.usage else 0\n        estimated_cost = (tokens * 0.75) / 1_000_000  # Rough estimate for claude-3.5-haiku\n        \n        logging.info(f\"LLM_SUCCESS tokens={tokens} time={duration:.2f}s cost=${estimated_cost:.4f}\")\n        return response.choices[0].message.content\n        \n    except Exception as e:\n        logging.error(f\"LLM_ERROR: {e}\")\n        return \"Sorry, I'm having trouble generating responses right now. Please try again!\"
