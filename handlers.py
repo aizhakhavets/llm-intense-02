@@ -1,10 +1,12 @@
 from aiogram import Router
 from aiogram.types import Message
 from aiogram.filters import Command
-from llm_client import generate_response, generate_recipe_with_local_ingredients
+from llm_client import generate_contextual_response, generate_recipe_with_local_ingredients
 from config import MAX_CONTEXT_MESSAGES
 from ingredient_intelligence import select_surprise_ingredients, get_cultural_context, has_local_ingredients
+from surprise_verification import verify_recipe_surprise, enhance_recipe, get_regeneration_hints
 import re
+import logging
 
 router = Router()
 
@@ -17,7 +19,10 @@ conversation_states = {
     "discovering_location": "asking_mood", 
     "asking_mood": "checking_skill_level",
     "checking_skill_level": "ready_for_recipe",
-    "ready_for_recipe": "recipe_generated"
+    "ready_for_recipe": "recipe_generated",
+    "recipe_generated": "post_recipe_reaction",
+    "post_recipe_reaction": "post_recipe_followup",
+    "post_recipe_followup": "post_recipe_followup"  # Loop in followup state
 }
 
 # Track user state and profile per chat_id
@@ -78,51 +83,6 @@ def extract_user_info(user_message: str, current_state: str) -> dict:
         
     return info
 
-def get_next_question(chat_id: int, current_state: str, user_message: str = "") -> str:
-    """Generate next question based on conversation state with personality"""
-    
-    if current_state == "waiting_for_ingredients":
-        return (
-            "Fantastic ingredients! 🍽️✨ Now, here's where the magic happens... "
-            "Mind sharing where you're from? (This helps me surprise you with the most "
-            "unexpected local flavor combinations!) 🌍🎭"
-        )
-    
-    elif current_state == "discovering_location":
-        profile = user_profiles.get(chat_id, {})
-        location = profile.get('location', '')
-        
-        if location and has_local_ingredients(location):
-            context = get_cultural_context(location)
-            return (
-                f"Ah, {location}! 🌟 *rubs hands together mischievously* "
-                f"I'm already plotting something inspired by {context}... "
-                f"\n\nWhat's your cooking mood today? Feeling adventurous and ready to "
-                f"shock your taste buds? Or more in a comfort-food-with-a-twist mood? 🎭🍳"
-            )
-        else:
-            return (
-                "Interesting! 🤔 I love a good culinary mystery... "
-                "What's your cooking mood today? Feeling adventurous and ready to "
-                "experiment, or more in a comfort-food zone? 🎭🍳"
-            )
-            
-    elif current_state == "asking_mood":
-        return (
-            "Perfect vibe! 😄✨ One last thing before I work my culinary magic... "
-            "Are you more of a kitchen ninja (confident with complex techniques) or "
-            "a cautious experimenter (prefer simpler, foolproof methods)? 👨‍🍳🥷"
-        )
-        
-    elif current_state == "checking_skill_level":
-        return (
-            "Excellent! 🎉 Now I have everything I need to create something "
-            "absolutely surprising for you! Give me a moment to channel some "
-            "culinary chaos... 🧙‍♂️✨"
-        )
-        
-    return "Tell me more! 😊"
-
 def should_generate_recipe(chat_id: int) -> bool:
     """Check if we have enough information to generate a surprising recipe"""
     profile = user_profiles.get(chat_id, {})
@@ -154,7 +114,7 @@ async def start_handler(message: Message):
 
 @router.message()
 async def message_handler(message: Message):
-    """Handle user message with step-by-step conversation flow"""
+    """Handle user message with LLM-powered contextual conversation flow"""
     chat_id = message.chat.id
     user_message = message.text
     
@@ -172,15 +132,70 @@ async def message_handler(message: Message):
     
     # Check if ready for recipe generation
     if should_generate_recipe(chat_id):
-        # Generate recipe with local ingredient intelligence
-        response = await generate_recipe_with_local_ingredients(chat_id, user_profiles[chat_id])
+        # Generate and verify recipe with regeneration loop (max 3 attempts)
+        max_attempts = 3
+        attempt = 1
+        final_recipe = None
+        verification_result = None
+        
+        while attempt <= max_attempts:
+            logging.info(f"RECIPE_ATTEMPT chat_id={chat_id} attempt={attempt}/{max_attempts}")
+            
+            # Generate recipe with local ingredient intelligence
+            # Use regeneration hints for attempts after the first one
+            hints = None
+            if attempt > 1 and verification_result:
+                # Get hints from previous verification result
+                hints = get_regeneration_hints(verification_result, attempt)
+            
+            current_recipe = await generate_recipe_with_local_ingredients(chat_id, user_profiles[chat_id], hints)
+            
+            # Verify recipe for surprise factor and humor
+            logging.info(f"VERIFY_START chat_id={chat_id} attempt={attempt} - checking surprise factor and humor")
+            verification_result = await verify_recipe_surprise(current_recipe, user_profiles[chat_id])
+            
+            # Check if recipe meets surprise criteria
+            surprise_threshold = 0.5  # Minimum surprise score required
+            meets_surprise_criteria = (
+                verification_result["surprise_score"] >= surprise_threshold and 
+                verification_result["has_humor"]
+            )
+            
+            if meets_surprise_criteria:
+                # Recipe passed verification - use it
+                logging.info(f"RECIPE_VERIFIED chat_id={chat_id} attempt={attempt} surprise_score={verification_result['surprise_score']} has_humor={verification_result['has_humor']}")
+                final_recipe = current_recipe
+                break
+            else:
+                # Recipe failed verification
+                logging.info(f"RECIPE_FAILED_VERIFICATION chat_id={chat_id} attempt={attempt} surprise_score={verification_result['surprise_score']} has_humor={verification_result['has_humor']}")
+                
+                if attempt == max_attempts:
+                    # Last attempt - enhance the recipe instead of regenerating
+                    logging.info(f"MAX_ATTEMPTS_REACHED chat_id={chat_id} - enhancing recipe")
+                    final_recipe = await enhance_recipe(current_recipe, verification_result)
+                else:
+                    # Try regenerating with more emphasis on surprise
+                    logging.info(f"REGENERATING_RECIPE chat_id={chat_id} attempt={attempt} - trying again")
+                    attempt += 1
+                    continue
+            
+            attempt += 1
+        
+        response = final_recipe if final_recipe else "Sorry, I'm having trouble creating a surprising enough recipe. Please try again! 😅✨"
         user_states[chat_id] = "recipe_generated"
     else:
-        # Generate next question in the conversation flow
-        response = get_next_question(chat_id, current_state, user_message)
+        # Generate contextual response for conversation flow
+        conversation_history = get_conversation_history(chat_id)
+        response = await generate_contextual_response(
+            chat_id,
+            user_profiles.get(chat_id, {}),
+            conversation_history,
+            current_state
+        )
         
         # Move to next state
-        next_state = conversation_states.get(current_state, current_state)
+        next_state = conversation_states.get(current_state, "post_recipe_followup")
         user_states[chat_id] = next_state
     
     # Add assistant response to conversation history
