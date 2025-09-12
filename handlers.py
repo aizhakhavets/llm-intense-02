@@ -49,39 +49,95 @@ def extract_user_info(user_message: str, current_state: str) -> dict:
     """Extract relevant user information from current message"""
     info = {}
     message_lower = user_message.lower()
+    user_message_clean = user_message.strip()
     
     if current_state == "waiting_for_ingredients":
-        # Extract ingredients - simple approach
-        info['ingredients'] = user_message.strip()
+        # Extract ingredients - only if message seems to contain ingredients
+        if len(user_message_clean) > 2 and not user_message_clean.lower() in ['hi', 'hello', 'hey', 'start', 'ok', 'yes', 'no']:
+            info['ingredients'] = user_message_clean
         
     elif current_state == "discovering_location":
         # Extract location/country information
-        # Look for country names, "from", "in", etc.
         location_patterns = [
             r"from ([\w\s]+)",
             r"in ([\w\s]+)", 
-            r"i'm ([\w\s]+)",
+            r"i'm from ([\w\s]+)",
             r"live in ([\w\s]+)",
-            r"based in ([\w\s]+)"
+            r"based in ([\w\s]+)",
+            r"i am in ([\w\s]+)"
         ]
         
         for pattern in location_patterns:
             match = re.search(pattern, message_lower)
             if match:
-                info['location'] = match.group(1).strip()
+                location = match.group(1).strip()
+                # Validate location - should be more than just articles/pronouns
+                if len(location) > 2 and location not in ['the', 'my', 'a', 'an', 'of']:
+                    info['location'] = location
                 break
         
-        # If no pattern match, assume entire message is location
-        if 'location' not in info and len(user_message.strip()) < 30:
-            info['location'] = user_message.strip()
+        # If no pattern match, assume entire message is location if it looks valid
+        if 'location' not in info and len(user_message_clean) > 2 and len(user_message_clean) < 50:
+            # Filter out common non-location responses
+            if user_message_clean.lower() not in ['hi', 'hello', 'hey', 'ok', 'yes', 'no', 'sure', 'thanks', 'thank you']:
+                info['location'] = user_message_clean
             
     elif current_state == "asking_mood":
-        info['mood'] = user_message.strip()
+        # Only accept mood if it's not a generic response
+        if len(user_message_clean) > 1 and user_message_clean.lower() not in ['hi', 'hello', 'hey', 'ok', 'yes', 'no']:
+            info['mood'] = user_message_clean
         
     elif current_state == "checking_skill_level":
-        info['skill_level'] = user_message.strip()
+        # Only accept skill level if it seems reasonable
+        if len(user_message_clean) > 1 and user_message_clean.lower() not in ['hi', 'hello', 'hey', 'ok', 'yes', 'no']:
+            info['skill_level'] = user_message_clean
         
     return info
+
+def get_conversation_context_summary(conversation_history: list[dict], user_profile: dict) -> str:
+    """Generate context summary of what user has shared so far for better LLM understanding"""
+    context_parts = []
+    
+    # Add what we know about the user
+    if user_profile.get('ingredients'):
+        context_parts.append(f"User has ingredients: {user_profile['ingredients']}")
+    if user_profile.get('location'):
+        context_parts.append(f"User is from: {user_profile['location']}")
+    if user_profile.get('mood'):
+        context_parts.append(f"User's cooking mood: {user_profile['mood']}")
+    if user_profile.get('skill_level'):
+        context_parts.append(f"User's skill level: {user_profile['skill_level']}")
+    
+    # Add recent conversation highlights (last 2 user messages if meaningful)
+    recent_user_messages = [msg['content'] for msg in conversation_history[-4:] if msg['role'] == 'user']
+    if recent_user_messages:
+        context_parts.append(f"Recent user messages: {'; '.join(recent_user_messages[-2:])}")
+    
+    return "; ".join(context_parts) if context_parts else "New conversation starting"
+
+def should_ask_for_missing_info(user_profile: dict) -> str:
+    """Determine what critical information is still needed, if any"""
+    if not user_profile.get('ingredients'):
+        return 'ingredients'
+    elif not user_profile.get('location'):
+        return 'location'
+    elif not user_profile.get('mood'):
+        return 'mood'  
+    elif not user_profile.get('skill_level'):
+        return 'skill_level'
+    return None
+
+def is_information_sufficient(user_profile: dict, current_state: str) -> bool:
+    """Check if we have sufficient information for current state to proceed"""
+    if current_state == "waiting_for_ingredients":
+        return bool(user_profile.get('ingredients'))
+    elif current_state == "discovering_location":
+        return bool(user_profile.get('location'))
+    elif current_state == "asking_mood":
+        return bool(user_profile.get('mood'))
+    elif current_state == "checking_skill_level":
+        return bool(user_profile.get('skill_level'))
+    return True  # For other states, assume we can proceed
 
 def should_generate_recipe(chat_id: int) -> bool:
     """Check if we have enough information to generate a surprising recipe"""
@@ -185,18 +241,50 @@ async def message_handler(message: Message):
         response = final_recipe if final_recipe else "Sorry, I'm having trouble creating a surprising enough recipe. Please try again! 😅✨"
         user_states[chat_id] = "recipe_generated"
     else:
-        # Generate contextual response for conversation flow
+        # Generate contextual response using conversation-aware approach
         conversation_history = get_conversation_history(chat_id)
+        user_profile = user_profiles.get(chat_id, {})
+        
+        # Create context summary for better LLM understanding
+        context_summary = get_conversation_context_summary(conversation_history, user_profile)
+        missing_info = should_ask_for_missing_info(user_profile)
+        
+        # Add context summary to the conversation for LLM
+        enhanced_conversation_history = conversation_history.copy()
+        if context_summary != "New conversation starting":
+            enhanced_conversation_history.append({
+                "role": "system", 
+                "content": f"CONVERSATION CONTEXT: {context_summary}"
+            })
+        
+        # Add guidance about missing information if needed
+        if missing_info:
+            enhanced_conversation_history.append({
+                "role": "system",
+                "content": f"MISSING INFO: Still need to learn about user's {missing_info}. Work this into the conversation naturally."
+            })
+        
         response = await generate_contextual_response(
             chat_id,
-            user_profiles.get(chat_id, {}),
-            conversation_history,
+            user_profile,
+            enhanced_conversation_history,
             current_state
         )
         
-        # Move to next state
-        next_state = conversation_states.get(current_state, "post_recipe_followup")
-        user_states[chat_id] = next_state
+        # Smart state transitions based on information completeness rather than rigid rules
+        if missing_info is None and current_state not in ["post_recipe_reaction", "post_recipe_followup"]:
+            # We have all info needed - transition toward recipe generation
+            user_states[chat_id] = "ready_for_recipe"
+            logging.info(f"SMART_TRANSITION chat_id={chat_id} -> ready_for_recipe (all info collected)")
+        elif current_state in ["post_recipe_reaction", "post_recipe_followup"]:
+            # Stay in post-recipe conversation mode
+            user_states[chat_id] = "post_recipe_followup"
+        elif user_info:
+            # User provided some new information, keep conversing
+            logging.info(f"CONTEXT_CONTINUE chat_id={chat_id} state={current_state} - new info: {list(user_info.keys())}")
+        else:
+            # No new info extracted, stay in current state
+            logging.info(f"CONTEXT_STAY chat_id={chat_id} state={current_state} - no new information")
     
     # Add assistant response to conversation history
     add_to_conversation(chat_id, "assistant", response)
