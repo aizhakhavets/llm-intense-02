@@ -1,7 +1,7 @@
 from aiogram import Router
 from aiogram.types import Message
 from aiogram.filters import Command
-from llm_client import generate_contextual_response, generate_recipe_with_local_ingredients
+from llm_client import generate_contextual_response, generate_recipe_with_local_ingredients, generate_recipe_variations
 from config import MAX_CONTEXT_MESSAGES
 from ingredient_intelligence import select_surprise_ingredients, get_cultural_context, has_local_ingredients
 from surprise_verification import verify_recipe_surprise, enhance_recipe, get_regeneration_hints
@@ -30,20 +30,21 @@ user_states: dict[int, str] = {}
 user_profiles: dict[int, dict] = {}
 
 def add_to_conversation(chat_id: int, role: str, content: str):
-    """Add message to conversation history and auto-trim if needed"""
+    """Add message with automatic trimming for token efficiency"""
     if chat_id not in conversations:
         conversations[chat_id] = []
     
-    # Add new message
     conversations[chat_id].append({"role": role, "content": content})
     
-    # Auto-trim if exceeded limit (keep last MAX_CONTEXT_MESSAGES)
-    if len(conversations[chat_id]) > MAX_CONTEXT_MESSAGES:
-        conversations[chat_id] = conversations[chat_id][-MAX_CONTEXT_MESSAGES:]
+    # Keep last 12 messages (more generous with 10k tokens)
+    if len(conversations[chat_id]) > 12:
+        conversations[chat_id] = conversations[chat_id][-12:]
 
 def get_conversation_history(chat_id: int) -> list[dict]:
-    """Get conversation history for chat_id"""
-    return conversations.get(chat_id, [])
+    """Get recent conversation history (token-aware)"""
+    history = conversations.get(chat_id, [])
+    # Keep last 8 messages for better token efficiency in requests
+    return history[-8:] if len(history) > 8 else history
 
 def extract_user_info(user_message: str, current_state: str) -> dict:
     """Extract relevant user information from current message"""
@@ -150,12 +151,118 @@ def should_generate_recipe(chat_id: int) -> bool:
     
     return has_required and current_state == "ready_for_recipe"
 
+def detect_user_language(user_message: str) -> str:
+    """Detect user language from message content (simple approach)"""
+    message_lower = user_message.lower().strip()
+    
+    # Simple keyword-based detection for common languages
+    language_indicators = {
+        "russian": ["привет", "спасибо", "пожалуйста", "как", "что", "где", "когда", "почему"],
+        "spanish": ["hola", "gracias", "por favor", "cómo", "qué", "dónde", "cuándo", "por qué"],
+        "french": ["bonjour", "merci", "s'il vous plaît", "comment", "quoi", "où", "quand", "pourquoi"],
+        "german": ["hallo", "danke", "bitte", "wie", "was", "wo", "wann", "warum"],
+        "dutch": ["hallo", "dank je", "alsjeblieft", "hoe", "wat", "waar", "wanneer", "waarom"],
+        "italian": ["ciao", "grazie", "prego", "come", "cosa", "dove", "quando", "perché"],
+        "portuguese": ["olá", "obrigado", "por favor", "como", "que", "onde", "quando", "por que"]
+    }
+    
+    # Check for language indicators
+    for language, keywords in language_indicators.items():
+        if any(keyword in message_lower for keyword in keywords):
+            return language
+    
+    # Default to English if no clear indicators
+    return "english"
+
+def update_user_language(chat_id: int, user_message: str):
+    """Update user's detected language in profile"""
+    if chat_id not in user_profiles:
+        user_profiles[chat_id] = {}
+    
+    # Only update if we don't have language yet or if message has clear indicators
+    current_language = user_profiles[chat_id].get('language', 'english')
+    detected_language = detect_user_language(user_message)
+    
+    if detected_language != current_language:
+        user_profiles[chat_id]['language'] = detected_language
+        logging.info(f"LANGUAGE_DETECTED chat_id={chat_id} language={detected_language}")
+
+def is_variation_request(user_message: str, user_language: str = "english") -> bool:
+    """Detect variation requests in multiple languages"""
+    message_lower = user_message.lower().strip()
+    
+    # Multilingual variation keywords
+    variation_keywords_by_language = {
+        "english": ["variation", "variations", "different", "another", "more ideas", "twist", "twists", "other version", "alternative", "change it"],
+        "russian": ["вариант", "варианты", "другой", "еще", "больше идей", "поворот", "изменить", "альтернатива"],
+        "spanish": ["variación", "variaciones", "diferente", "otro", "más ideas", "giro", "cambiar", "alternativa"],
+        "french": ["variation", "variations", "différent", "autre", "plus d'idées", "tournure", "changer", "alternative"],
+        "german": ["variante", "varianten", "anders", "andere", "mehr ideen", "wendung", "ändern", "alternative"],
+        "dutch": ["variatie", "variaties", "anders", "andere", "meer ideeën", "wending", "veranderen", "alternatief"],
+        "italian": ["variazione", "variazioni", "diverso", "altro", "più idee", "svolta", "cambiare", "alternativa"],
+        "portuguese": ["variação", "variações", "diferente", "outro", "mais ideias", "virada", "mudar", "alternativa"]
+    }
+    
+    keywords = variation_keywords_by_language.get(user_language, variation_keywords_by_language["english"])
+    return any(keyword in message_lower for keyword in keywords)
+
+def has_recent_recipe(conversation_history: list[dict]) -> bool:
+    """Check if there was a recent recipe in conversation"""
+    # Look for recipe indicators in last few assistant messages
+    recent_assistant_msgs = [msg['content'] for msg in conversation_history[-6:] 
+                            if msg['role'] == 'assistant']
+    
+    recipe_indicators = ["**Ingredients:**", "**Steps:**", "**Result:**", "# "]
+    
+    return any(indicator in msg for msg in recent_assistant_msgs 
+               for indicator in recipe_indicators)
+
+def detect_conversation_ending(user_message: str, conversation_history: list[dict]) -> bool:
+    """Detect if conversation is ending or going poorly"""
+    message_lower = user_message.lower().strip()
+    
+    # Short/dismissive responses
+    ending_indicators = [
+        "ok", "thanks", "bye", "goodbye", "stop", "enough", "no more",
+        "that's it", "done", "finished", "nothing else"
+    ]
+    
+    # Very short messages
+    if len(message_lower) <= 3 and message_lower in ending_indicators:
+        return True
+    
+    # Check for conversation stagnation (repeated similar responses)
+    if len(conversation_history) >= 4:
+        recent_user_messages = [msg['content'].lower() 
+                               for msg in conversation_history[-4:] 
+                               if msg['role'] == 'user']
+        if len(set(recent_user_messages)) <= 2:  # User repeating same responses
+            return True
+    
+    return False
+
+def generate_recovery_prompt(user_profile: dict) -> str:
+    """Generate prompt to re-engage user with new questions"""
+    missing_info = []
+    
+    if not user_profile.get('location'):
+        missing_info.append("your location for local surprises")
+    if not user_profile.get('mood'):
+        missing_info.append("what cooking mood you're in")
+    if not user_profile.get('skill_level'):
+        missing_info.append("your cooking confidence level")
+    
+    if missing_info:
+        return f"Let me ask about {missing_info[0]} to create something amazing for you!"
+    else:
+        return "What other ingredients are hiding in your kitchen? Or shall we explore a completely different cuisine?"
+
 @router.message(Command("start"))
 async def start_handler(message: Message):
-    """Initialize conversation with welcome message and first question"""
+    """Initialize conversation with multilingual welcome"""
     chat_id = message.chat.id
     
-    # Reset conversation state for new session
+    # Reset conversation state
     user_states[chat_id] = "waiting_for_ingredients"
     user_profiles[chat_id] = {}
     
@@ -163,130 +270,68 @@ async def start_handler(message: Message):
         "🌟✨ Welcome, culinary adventurer! I'm your funny recipe wizard who creates "
         "impossible-but-delicious combinations rooted in ancient fusion traditions!\n\n"
         "Let's start our culinary detective work... What ingredients are currently "
-        "lurking in your fridge or pantry? Tell me what you have available! 🥘🔍"
+        "lurking in your fridge or pantry? Tell me what you have available! 🥘🔍\n\n"
+        "💬 I can speak your language - just write to me in any language!"
     )
     
     await message.answer(welcome_message)
 
 @router.message()
 async def message_handler(message: Message):
-    """Handle user message with LLM-powered contextual conversation flow"""
+    """Handle user message with multilingual support, variation detection, and recovery logic"""
     chat_id = message.chat.id
     user_message = message.text
     
-    # Get current conversation state (default to waiting for ingredients)
-    current_state = user_states.get(chat_id, "waiting_for_ingredients")
+    # LANGUAGE DETECTION & UPDATE
+    update_user_language(chat_id, user_message)
     
-    # Extract and store user information based on current state
+    # Get current state and profile
+    current_state = user_states.get(chat_id, "waiting_for_ingredients")
+    user_profile = user_profiles.get(chat_id, {})
+    conversation_history = get_conversation_history(chat_id)
+    user_language = user_profile.get('language', 'english')
+    
+    # Extract and store user information
     user_info = extract_user_info(user_message, current_state)
     if chat_id not in user_profiles:
         user_profiles[chat_id] = {}
     user_profiles[chat_id].update(user_info)
     
-    # Add user message to conversation history
+    # Add to conversation history
     add_to_conversation(chat_id, "user", user_message)
     
-    # Check if ready for recipe generation
-    if should_generate_recipe(chat_id):
-        # Generate and verify recipe with regeneration loop (max 3 attempts)
-        max_attempts = 3
-        attempt = 1
-        final_recipe = None
-        verification_result = None
-        
-        while attempt <= max_attempts:
-            logging.info(f"RECIPE_ATTEMPT chat_id={chat_id} attempt={attempt}/{max_attempts}")
-            
-            # Generate recipe with local ingredient intelligence
-            # Use regeneration hints for attempts after the first one
-            hints = None
-            if attempt > 1 and verification_result:
-                # Get hints from previous verification result
-                hints = get_regeneration_hints(verification_result, attempt)
-            
-            current_recipe = await generate_recipe_with_local_ingredients(chat_id, user_profiles[chat_id], hints)
-            
-            # Verify recipe for surprise factor and humor
-            logging.info(f"VERIFY_START chat_id={chat_id} attempt={attempt} - checking surprise factor and humor")
-            verification_result = await verify_recipe_surprise(current_recipe, user_profiles[chat_id])
-            
-            # Check if recipe meets surprise criteria
-            surprise_threshold = 0.5  # Minimum surprise score required
-            meets_surprise_criteria = (
-                verification_result["surprise_score"] >= surprise_threshold and 
-                verification_result["has_humor"]
-            )
-            
-            if meets_surprise_criteria:
-                # Recipe passed verification - use it
-                logging.info(f"RECIPE_VERIFIED chat_id={chat_id} attempt={attempt} surprise_score={verification_result['surprise_score']} has_humor={verification_result['has_humor']}")
-                final_recipe = current_recipe
-                break
-            else:
-                # Recipe failed verification
-                logging.info(f"RECIPE_FAILED_VERIFICATION chat_id={chat_id} attempt={attempt} surprise_score={verification_result['surprise_score']} has_humor={verification_result['has_humor']}")
-                
-                if attempt == max_attempts:
-                    # Last attempt - enhance the recipe instead of regenerating
-                    logging.info(f"MAX_ATTEMPTS_REACHED chat_id={chat_id} - enhancing recipe")
-                    final_recipe = await enhance_recipe(current_recipe, verification_result)
-                else:
-                    # Try regenerating with more emphasis on surprise
-                    logging.info(f"REGENERATING_RECIPE chat_id={chat_id} attempt={attempt} - trying again")
-                    attempt += 1
-                    continue
-            
-            attempt += 1
-        
-        response = final_recipe if final_recipe else "Sorry, I'm having trouble creating a surprising enough recipe. Please try again! 😅✨"
+    # CHECK FOR VARIATION REQUEST (multilingual)
+    if is_variation_request(user_message, user_language) and has_recent_recipe(conversation_history):
+        logging.info(f"VARIATION_REQUEST chat_id={chat_id} language={user_language}")
+        response = await generate_recipe_variations(chat_id, user_profiles[chat_id])
+        user_states[chat_id] = "post_recipe_followup"
+    
+    # RECOVERY LOGIC - Check if conversation is ending
+    elif detect_conversation_ending(user_message, conversation_history):
+        recovery_prompt = generate_recovery_prompt(user_profiles[chat_id])
+        response = f"Wait! Before we wrap up... 🤔✨ {recovery_prompt}"
+        user_states[chat_id] = "discovering_location"
+    
+    # RECIPE GENERATION (simplified without complex verification for now)
+    elif should_generate_recipe(chat_id):
+        response = await generate_recipe_with_local_ingredients(
+            chat_id, user_profiles[chat_id]
+        )
         user_states[chat_id] = "recipe_generated"
+    
+    # NORMAL CONVERSATION
     else:
-        # Generate contextual response using conversation-aware approach
-        conversation_history = get_conversation_history(chat_id)
-        user_profile = user_profiles.get(chat_id, {})
-        
-        # Create context summary for better LLM understanding
-        context_summary = get_conversation_context_summary(conversation_history, user_profile)
-        missing_info = should_ask_for_missing_info(user_profile)
-        
-        # Add context summary to the conversation for LLM
-        enhanced_conversation_history = conversation_history.copy()
-        if context_summary != "New conversation starting":
-            enhanced_conversation_history.append({
-                "role": "system", 
-                "content": f"CONVERSATION CONTEXT: {context_summary}"
-            })
-        
-        # Add guidance about missing information if needed
-        if missing_info:
-            enhanced_conversation_history.append({
-                "role": "system",
-                "content": f"MISSING INFO: Still need to learn about user's {missing_info}. Work this into the conversation naturally."
-            })
-        
         response = await generate_contextual_response(
-            chat_id,
-            user_profile,
-            enhanced_conversation_history,
-            current_state
+            chat_id, user_profile, conversation_history, current_state
         )
         
-        # Smart state transitions based on information completeness rather than rigid rules
+        # Smart state transitions
+        missing_info = should_ask_for_missing_info(user_profile)
         if missing_info is None and current_state not in ["post_recipe_reaction", "post_recipe_followup"]:
-            # We have all info needed - transition toward recipe generation
             user_states[chat_id] = "ready_for_recipe"
-            logging.info(f"SMART_TRANSITION chat_id={chat_id} -> ready_for_recipe (all info collected)")
         elif current_state in ["post_recipe_reaction", "post_recipe_followup"]:
-            # Stay in post-recipe conversation mode
             user_states[chat_id] = "post_recipe_followup"
-        elif user_info:
-            # User provided some new information, keep conversing
-            logging.info(f"CONTEXT_CONTINUE chat_id={chat_id} state={current_state} - new info: {list(user_info.keys())}")
-        else:
-            # No new info extracted, stay in current state
-            logging.info(f"CONTEXT_STAY chat_id={chat_id} state={current_state} - no new information")
     
-    # Add assistant response to conversation history
+    # Add response and send
     add_to_conversation(chat_id, "assistant", response)
-    
     await message.answer(response)
