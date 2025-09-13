@@ -4,116 +4,84 @@ import time
 from config import OPENROUTER_API_KEY, OPENROUTER_MODEL, LLM_TEMPERATURE, LLM_MAX_TOKENS
 from ingredient_intelligence import select_surprise_ingredients, get_cultural_context, has_local_ingredients
 
-def build_dynamic_system_prompt(user_profile: dict = None, local_ingredients: list = None, conversation_state: str = None, for_recipe_generation: bool = False, surprise_focus: bool = False) -> str:
-    """Build system prompt with user context, local ingredients, and conversational task"""
+def build_lean_system_prompt(user_profile: dict = None, for_recipe_generation: bool = False, for_variations: bool = False) -> str:
+    """Lean system prompt with language adaptation - KISS principle"""
     
-    base_prompt = """You are a joyful, culturally-aware recipe wizard for Telegram who creates entertaining culinary experiments rooted in ancient fusion traditions! 🌟✨
+    # Get user language
+    user_language = user_profile.get('language', 'english') if user_profile else 'english'
+    
+    # Enhanced language persistence instruction
+    language_instruction = f"""
+MANDATORY LANGUAGE RULE: You MUST respond ONLY in {user_language.upper()} language.
+- ALL responses must be in {user_language} - NO EXCEPTIONS
+- ALL recipes, ingredients, steps, jokes, and cultural references in {user_language}
+- If user continues conversation in {user_language}, NEVER switch to English
+- Maintain {user_language} throughout the ENTIRE conversation
+- Do NOT mix languages or provide English alternatives unless explicitly asked"""
 
-PERSONALITY TRAITS:
-🎭 Joyful, emoji-rich but never childish - professional advice wrapped in playful presentation
-🏛️ Reference ancient culinary history and fusion traditions (Silk Road, Ottoman Empire, Aztec-Spanish fusion, etc.)
-🧠 Smart, nuanced suggestions with cultural context and storytelling
-🌍 Draw from global, lesser-known cuisine combinations and historical food exchanges
-💫 Proactively offer creative variations with humor after each recipe
-🎪 Use cultural commentary with playful humor ("because the French can't resist improving everyone's recipes!")
-"""
-    
-    # Add current user context
-    if user_profile:
-        base_prompt += "\n\nCURRENT USER CONTEXT:\n"
+    if for_variations:
+        prompt = f"""You are a joyful recipe wizard providing creative recipe variations! 🌟✨
+{language_instruction}
+
+Generate 2-3 NEW creative variations of the previous recipe with different cultural twists.
+
+FORMAT:
+🌊 **[Regional] Version**: [adaptation with humor and regional ingredients]
+🌮 **[Culture] Twist**: [historical/cultural spin with wit]  
+🍷 **[Style] Take**: [cooking style variation with playful commentary]
+
+Make each variation unique and entertaining in {user_language}!"""
         
-        if user_profile.get('location'):
-            location = user_profile['location']
-            cultural_context = get_cultural_context(location)
-            base_prompt += f"🌍 User location: {location} ({cultural_context})\n"
-            
-        if user_profile.get('ingredients'):
-            base_prompt += f"🥘 User ingredients: {user_profile['ingredients']}\n"
-            
-        if local_ingredients:
-            base_prompt += f"✨ Local surprise ingredients to include: {', '.join(local_ingredients)}\n"
-            
-        if user_profile.get('mood'):
-            base_prompt += f"🎭 User mood: {user_profile['mood']}\n"
-            
-        if user_profile.get('skill_level'):
-            base_prompt += f"👨‍🍳 Cooking skill level: {user_profile['skill_level']}\n"
+    elif for_recipe_generation:
+        prompt = f"""You are a joyful recipe wizard creating funny, surprising recipes! 🌟✨
+{language_instruction}
 
-    if for_recipe_generation:
-        base_prompt += """
+Create ONE surprising recipe. Keep it entertaining but cookable.
 
-RECIPE GENERATION TASK:
-- Create ONE surprising recipe using user ingredients + local surprise ingredients
-- IMPORTANT: Make it EXTREMELY SURPRISING but technically cookable
-- Focus on unexpected ingredient combinations that create culinary surprise
-- Include at least one joke or humorous element in the recipe
-- Generate 3-7 steps based on skill level (simpler for beginners)
-- Include cultural/historical context and storytelling
-- Add sensory descriptions with cultural metaphors
+RECIPE FORMAT (in {user_language}):
+# [Creative Name] ([Culture-Context]) 🏺✨
+**The Story:** [Brief cultural background in {user_language}]
+**Ingredients:** [user ingredients + local surprises]
+**Steps:** [3-5 clear steps with humor in {user_language}]
+**Result:** [Surprising taste description in {user_language}]
 
-RECIPE FORMAT:
-# [Creative Name] ([Historical-Context]) 🏺✨
+**Want more fun twists?** Just ask for variations! 😉
 
-**The Story:** [Brief cultural/historical background that inspired the dish]
-
-**Ingredients:**
-- [User's original ingredients]
-- [Local surprise ingredients with cultural notes]
-- [Any additional needed ingredients]
-
-**Steps:**
-1. [Cultural cooking technique reference] - [clear instruction with humor]
-2. [Continue with 3-7 total steps based on skill level]
-3. [Include sensory cues and cooking wisdom]
-
-**Result:** [Sensory description with cultural metaphors and surprising taste profile]
-
-MANDATORY PROACTIVE VARIATIONS:
-After EVERY recipe, offer 2-3 humorous variations:
-
-**Plot twist time! 🎭 Want to shake things up even more?**
-
-🌊 **[Regional] Version**: [adaptation with regional twist and humor]
-🌮 **[Culture] Revenge**: [historical timeline twist with playful commentary] 
-🍷 **[Culture] Rebellion**: [cultural adaptation with witty observation]
-
-Which timeline calls to you? Or shall we explore completely different cosmic combinations? ✨
-
-Generate the complete recipe now!"""
+Generate complete recipe now in {user_language}!"""
     else:
-        base_prompt += """
+        # Conversation mode
+        prompt = f"""You are a joyful recipe wizard! 🌟✨
+{language_instruction}
 
-CONVERSATIONAL APPROACH:
-React naturally to what the user actually says. Don't just follow a script - build on their responses!
+PERSONALITY: Joyful, culturally-aware, emoji-rich but professional. Respond naturally in {user_language}.
 
-CONTEXT-AWARE CONVERSATION GUIDELINES:
-- ALWAYS acknowledge and react to user's specific answers first
-- If they share ingredients, comment on the specific ingredients they mentioned
-- If they mention location, show cultural knowledge and enthusiasm about that place
-- If they share mood/preferences, connect it to cooking style suggestions
-- Ask follow-up questions that build naturally from their responses
-- Be curious about their answers - dig deeper with interest
-- Connect their responses to culinary possibilities
+CONVERSATION APPROACH - CRITICAL CONTEXT RULES:
+- ALWAYS acknowledge what user just shared specifically (in {user_language})
+- Reference previous conversation context and build upon user's answers
+- Ask natural follow-up questions based on their actual responses (in {user_language})
+- Show you remember what they told you earlier (ingredients, location, preferences)
+- React naturally to user requests (variations, changes, new recipes)
 
-INFORMATION GATHERING PRIORITY:
-1. What ingredients do you have? (acknowledge what they share)
-2. Where are you located? (to suggest local surprise ingredients) 
-3. What's your cooking mood today? (adventurous, comfort, etc.)
-4. What's your skill level? (adjust recipe complexity)
+INFORMATION TO GATHER:
+1. Ingredients available  
+2. Location (for local surprises)
+3. Cooking mood/preferences
+4. Skill level
 
-BUT IMPORTANT: Only ask about missing information if the conversation naturally leads there. 
-Focus on building engaging conversation around what they've already shared.
-
-CONVERSATION FLOW EXAMPLES:
-✅ User: "I have chicken and pasta" 
-   Bot: "Ooh, chicken and pasta! Classic combo with endless possibilities! 🍝✨ Are you feeling adventurous today, or more in a comfort food mood?"
-
-✅ User: "I'm from Italy"
-   Bot: "Italy! 🇮🇹 The motherland of incredible flavors! I'm already thinking of some wild local ingredients we could surprise you with... What ingredients are you working with today?"
-
-Keep responses conversational, engaging, and naturally flowing from their input!"""
-
-    return base_prompt
+SPECIAL: If user asks for "variations", "more ideas", "different versions", "twists" - they want recipe variations!
+Respond to everything in {user_language}."""
+    
+    # Add minimal context
+    if user_profile:
+        context = []
+        if user_profile.get('ingredients'):
+            context.append(f"User has: {user_profile['ingredients']}")
+        if user_profile.get('location'):
+            context.append(f"Location: {user_profile['location']}")
+        if context:
+            prompt += f"\n\nKNOWN: {'; '.join(context)}"
+    
+    return prompt
 
 async def generate_recipe_with_local_ingredients(chat_id: int, user_profile: dict, regeneration_hints: str = None) -> str:
     """Generate recipe using user profile and local ingredient intelligence"""
@@ -130,8 +98,8 @@ async def generate_recipe_with_local_ingredients(chat_id: int, user_profile: dic
     # Select local surprise ingredients
     local_ingredients = select_surprise_ingredients(user_location, user_ingredients, count=2)
     
-    # Build dynamic system prompt with context and surprise focus
-    system_prompt = build_dynamic_system_prompt(user_profile, local_ingredients, for_recipe_generation=True, surprise_focus=True)
+    # Build lean system prompt for recipe generation
+    system_prompt = build_lean_system_prompt(user_profile, for_recipe_generation=True)
     
     client = openai.Client(
         api_key=OPENROUTER_API_KEY,
@@ -139,16 +107,12 @@ async def generate_recipe_with_local_ingredients(chat_id: int, user_profile: dic
     )
     
     try:
-        # Create focused recipe generation message with emphasis on surprise and humor
-        recipe_request = f"""Create an EXTREMELY surprising recipe combining:
+        # Create simplified recipe request
+        recipe_request = f"""Create a SURPRISING recipe combining:
 - User ingredients: {user_ingredients_str}
 - Local surprise ingredients: {', '.join(local_ingredients) if local_ingredients else 'none available'}
 
-Requirements:
-- Make it EXTREMELY surprising with unexpected ingredient combinations
-- Include at least one joke or humorous element
-- Ensure it's technically cookable despite the surprising combinations
-- Add cultural context and storytelling"""
+Make it entertaining and technically cookable!"""
         
         # Add regeneration hints if provided (for subsequent attempts)
         if regeneration_hints:
@@ -182,8 +146,8 @@ async def generate_contextual_response(chat_id: int, user_profile: dict, convers
     
     start_time = time.time()
     
-    # Build dynamic system prompt for conversation
-    system_prompt = build_dynamic_system_prompt(user_profile, conversation_state=current_state, for_recipe_generation=False)
+    # Build lean system prompt for conversation
+    system_prompt = build_lean_system_prompt(user_profile, for_recipe_generation=False)
     
     client = openai.Client(
         api_key=OPENROUTER_API_KEY,
@@ -224,11 +188,8 @@ def generate_response(chat_messages: list[dict], user_profile: dict = None) -> s
     )
     
     try:
-        # Use dynamic system prompt if profile available
-        if user_profile:
-            system_prompt = build_dynamic_system_prompt(user_profile)
-        else:
-            system_prompt = build_dynamic_system_prompt()
+        # Use lean system prompt
+        system_prompt = build_lean_system_prompt(user_profile)
             
         # Prepare messages: system prompt + chat history
         messages = [
@@ -252,3 +213,42 @@ def generate_response(chat_messages: list[dict], user_profile: dict = None) -> s
     except Exception as e:
         logging.error(f"LLM_ERROR: {e}")
         return "Sorry, I'm having trouble generating responses right now. Please try again!"
+
+async def generate_recipe_variations(chat_id: int, user_profile: dict) -> str:
+    """Generate additional recipe variations on demand"""
+    
+    start_time = time.time()
+    
+    system_prompt = build_lean_system_prompt(user_profile, for_variations=True)
+    
+    client = openai.Client(
+        api_key=OPENROUTER_API_KEY,
+        base_url="https://openrouter.ai/api/v1"
+    )
+    
+    try:
+        variation_request = """Generate 2-3 creative variations of the recent recipe with different cultural/regional twists. 
+        Make each unique and entertaining with humor!"""
+        
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": variation_request}
+        ]
+        
+        response = client.chat.completions.create(
+            model=OPENROUTER_MODEL,
+            messages=messages,
+            temperature=LLM_TEMPERATURE,
+            max_tokens=LLM_MAX_TOKENS
+        )
+        
+        duration = time.time() - start_time
+        tokens = response.usage.total_tokens if response.usage else 0
+        estimated_cost = (tokens * 0.75) / 1_000_000
+        
+        logging.info(f"VARIATIONS_SUCCESS chat_id={chat_id} tokens={tokens} time={duration:.2f}s cost=${estimated_cost:.4f}")
+        return response.choices[0].message.content
+        
+    except Exception as e:
+        logging.error(f"VARIATIONS_ERROR chat_id={chat_id}: {e}")
+        return "I'm having trouble coming up with variations right now! 😅 Want to try a completely new recipe instead?"

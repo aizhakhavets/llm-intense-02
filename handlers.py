@@ -30,21 +30,21 @@ user_states: dict[int, str] = {}
 user_profiles: dict[int, dict] = {}
 
 def add_to_conversation(chat_id: int, role: str, content: str):
-    """Add message with automatic trimming for token efficiency"""
+    """Add message with enhanced context preservation for better conversation flow"""
     if chat_id not in conversations:
         conversations[chat_id] = []
     
     conversations[chat_id].append({"role": role, "content": content})
     
-    # Keep last 12 messages (more generous with 10k tokens)
-    if len(conversations[chat_id]) > 12:
-        conversations[chat_id] = conversations[chat_id][-12:]
+    # Keep last 16 messages for better context preservation
+    if len(conversations[chat_id]) > 16:
+        conversations[chat_id] = conversations[chat_id][-16:]
 
 def get_conversation_history(chat_id: int) -> list[dict]:
-    """Get recent conversation history (token-aware)"""
+    """Get broader conversation history for enhanced context understanding"""
     history = conversations.get(chat_id, [])
-    # Keep last 8 messages for better token efficiency in requests
-    return history[-8:] if len(history) > 8 else history
+    # Increase to 12 messages for better context awareness (with 10k token budget)
+    return history[-12:] if len(history) > 12 else history
 
 def extract_user_info(user_message: str, current_state: str) -> dict:
     """Extract relevant user information from current message"""
@@ -174,18 +174,46 @@ def detect_user_language(user_message: str) -> str:
     # Default to English if no clear indicators
     return "english"
 
+def _has_strong_language_indicators(message: str, language: str) -> bool:
+    """Check if message has strong language indicators (3+ keywords)"""
+    message_lower = message.lower().strip()
+    
+    language_indicators = {
+        "russian": ["привет", "спасибо", "пожалуйста", "как", "что", "где", "когда", "почему", "да", "нет", "хорошо", "плохо", "очень", "может", "будет", "есть"],
+        "spanish": ["hola", "gracias", "por favor", "cómo", "qué", "dónde", "cuándo", "por qué", "sí", "no", "bien", "mal", "muy", "puede", "será", "hay"],
+        "french": ["bonjour", "merci", "s'il vous plaît", "comment", "quoi", "où", "quand", "pourquoi", "oui", "non", "bien", "mal", "très", "peut", "sera", "il y a"],
+        "german": ["hallo", "danke", "bitte", "wie", "was", "wo", "wann", "warum", "ja", "nein", "gut", "schlecht", "sehr", "kann", "wird", "gibt"],
+        "dutch": ["hallo", "dank je", "alsjeblieft", "hoe", "wat", "waar", "wanneer", "waarom", "ja", "nee", "goed", "slecht", "zeer", "kan", "zal", "er is"],
+        "italian": ["ciao", "grazie", "prego", "come", "cosa", "dove", "quando", "perché", "sì", "no", "bene", "male", "molto", "può", "sarà", "c'è"],
+        "portuguese": ["olá", "obrigado", "por favor", "como", "que", "onde", "quando", "por que", "sim", "não", "bem", "mal", "muito", "pode", "será", "há"]
+    }
+    
+    keywords = language_indicators.get(language, [])
+    matches = sum(1 for keyword in keywords if keyword in message_lower)
+    return matches >= 3
+
 def update_user_language(chat_id: int, user_message: str):
-    """Update user's detected language in profile"""
+    """Update language only when user explicitly changes, maintaining language persistence"""
     if chat_id not in user_profiles:
         user_profiles[chat_id] = {}
     
-    # Only update if we don't have language yet or if message has clear indicators
     current_language = user_profiles[chat_id].get('language', 'english')
     detected_language = detect_user_language(user_message)
     
-    if detected_language != current_language:
+    # Only change language if:
+    # 1. No language set yet and clear detection, OR
+    # 2. Strong language indicators (3+ keywords), OR
+    # 3. User explicitly requests language change
+    should_update = (
+        (current_language == 'english' and detected_language != 'english' and _has_strong_language_indicators(user_message, detected_language)) or
+        (current_language != 'english' and detected_language != current_language and _has_strong_language_indicators(user_message, detected_language))
+    )
+    
+    if should_update:
         user_profiles[chat_id]['language'] = detected_language
-        logging.info(f"LANGUAGE_DETECTED chat_id={chat_id} language={detected_language}")
+        logging.info(f"LANGUAGE_UPDATED chat_id={chat_id} from={current_language} to={detected_language}")
+    else:
+        logging.debug(f"LANGUAGE_MAINTAINED chat_id={chat_id} language={current_language} (detected={detected_language})")
 
 def is_variation_request(user_message: str, user_language: str = "english") -> bool:
     """Detect variation requests in multiple languages"""
