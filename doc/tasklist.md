@@ -4,10 +4,10 @@
 
 ## Progress Report
 
-**Current Status:** Iteration 12 Complete + Context & Language Fixes  
-**Last Updated:** September 13, 2025  
-**Completed Iterations:** 12/12 + Critical Bug Fixes  
-**Next Step:** Production Ready - All Core Issues Resolved  
+**Current Status:** Phase 2 Refactoring Started
+**Last Updated:** September 13, 2025
+**Completed Iterations:** 12/12
+**Next Step:** Rework solution to align with latest @vision.md and KISS principles
 
 ### Completion Summary:
 - [x] Iterations completed: 10
@@ -21,6 +21,61 @@
 - [x] Language switching bug fix: Complete (Bidirectional English↔Russian detection fixed)
 - [x] Conversation context fix: Complete (Enhanced context window and user response acknowledgment)
 - [x] Language persistence fix: Complete (Strong language indicators prevent auto-switching)
+
+---
+
+## Phase 2: Refactoring for Simplicity and Alignment
+
+*This phase reworks the existing solution to align with the updated @vision.md, focusing on KISS principles, simplification, and removing over-engineered components.*
+
+### Iteration 13: Align Configuration & Context Management ✅
+**Goal:** Synchronize the application with the 30-message context window from @vision.md
+**Test:** The bot maintains a coherent conversation over 30 interactions
+**Completed:** September 13, 2025
+
+- [x] Update configuration to support 30 messages
+  - [x] Set `MAX_CONTEXT_MESSAGES=30` in `config.py`
+  - [ ] **ACTION REQUIRED:** Create `.env.example` manually and set `MAX_CONTEXT_MESSAGES=30`. The agent cannot create this file due to security restrictions.
+- [x] Simplify context management in `handlers.py`
+  - [x] Remove the token-saving logic (8 messages in request, 12 in storage) from Iteration 12
+  - [x] Implement a simple list that stores the last 30 messages per chat_id
+- [x] Test: Conversation history is accurately maintained up to the new 30-message limit
+
+### Iteration 14: Unify Language Model & System Prompts ✅
+**Goal:** Consolidate all LLM logic and prompts to strictly follow `vision.md`
+**Test:** Bot uses the new system prompt correctly, including multi-language support for English, Russian, Dutch, and French
+**Completed:** September 13, 2025
+
+- [x] Update `llm_client.py` with the new unified system prompt
+  - [x] Replace all previous system prompts with the single, definitive prompt from `vision.md`
+- [x] Remove hardcoded language detection from `handlers.py`
+  - [x] Rely entirely on the LLM's capability to detect and respond in the user's language as guided by the new prompt
+- [x] Test: The bot successfully identifies and responds in the four specified languages based on user input
+
+### Iteration 15: Implement Conversation Cycle Logic ✅
+**Goal:** Implement the 30-interaction limit to re-tune user needs per @product_idea.md
+**Test:** After 30 interactions, the bot prompts the user to refresh their preferences
+**Completed:** September 13, 2025
+
+- [x] Add an interaction counter in `handlers.py`
+  - [x] Track the number of user/assistant message pairs for each chat_id
+- [x] Implement the re-tuning mechanism
+  - [x] When the counter reaches 30, trigger a message to ask the user for new preferences
+  - [x] Reset the conversation context (partially or fully) to start a fresh exploration
+- [x] Test: Bot initiates the re-tuning dialogue automatically after the 30th interaction
+
+### Iteration 16: Implement Pre-Recipe User Confirmation ✅
+**Goal:** Add a confirmation step where the bot summarizes collected user preferences before generating a recipe, as per the updated @vision.md.
+**Test:** The bot summarizes the user's ingredients and preferences, asks for confirmation, and waits for approval before generating the recipe.
+**Completed:** September 13, 2025
+
+- [x] Update the system prompt in `llm_client.py` to reflect the new confirmation flow from @vision.md.
+- [x] Modify `handlers.py` to introduce logic that can identify when it's time to ask for confirmation based on the conversation context.
+- [x] Implement the confirmation handling logic:
+  - [x] When the LLM generates a summary and confirmation request, the bot should handle the user's response.
+  - [x] If the user confirms, the next LLM call should be to generate the recipe.
+  - [x] If the user provides changes, the conversation should continue to refine preferences.
+- [x] Test: A full conversation flow where the bot summarizes preferences, user confirms, and recipe is generated.
 
 ---
 
