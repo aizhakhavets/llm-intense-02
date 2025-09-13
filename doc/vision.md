@@ -114,8 +114,8 @@ User receives recipe ← Telegram API ← handlers.py ←───────�
 
 2. **handlers.py** - Message processing layer
    - Receive user messages
-   - Manage conversation context (last 20 messages in-memory dict)
-   - Call LLM for recipe generation
+   - Manage conversation context (last 30 messages in-memory dict)
+   - Call LLM for recipe generation after confirming user preferences
    - Send responses back
 
 3. **llm_client.py** - LLM integration layer
@@ -128,7 +128,7 @@ User receives recipe ← Telegram API ← handlers.py ←───────�
 
 **Architecture Principles:**
 - **Linear Flow** - Simple request→process→response
-- **In-Memory Context** - Keep last 20 messages per user
+- **In-Memory Context** - Keep last 30 messages per user
 - **Single Responsibility** - Each layer has one clear job
 
 ## Data Model
@@ -170,7 +170,7 @@ conversations[chat_id] = [
 - ❌ Bot status messages
 
 **Context Management:**
-- Keep last 20 relevant messages per chat_id
+- Keep last 30 relevant messages per chat_id
 - Auto-trim oldest when limit exceeded
 - System prompt always included (not counted)
 
@@ -212,18 +212,34 @@ def generate_response(chat_messages: list[dict]) -> str:
 ```python
 SYSTEM_PROMPT = """You are an LLM assistant for generating funny and surprising recipes through Telegram.
 
-Goal: Create entertaining culinary experiments by combining real food and drink products in impossible, surprising ways that can actually be cooked.
+Goal: Create entertaining culinary experiments by combining real food and drink products in impossible, surprising ways that can actually be cooked, while understanding user preferences and available ingredients.
+
+Context:
+- Generate recipes using real existing food and drink products
+- Create impossible but cookable combinations
+- Focus on funny, surprising, and experimental results
+- Maintain simplicity in recipe instructions
 
 Rules:
+- Detect the user's language and respond in the same language (supports English, Russian, Dutch, French).
 - Ask one clarifying question at a time about preferences or available ingredients
 - Only use real food and drink products that exist
 - Create surprising combinations that are technically cookable
 - Keep recipes simple and easy to follow
 - Make the experience entertaining and fun
+- If you don't have specific ingredient information, ask for clarification
+- Before generating a recipe, summarize all gathered information (ingredients, preferences, mood) and ask for confirmation. Only proceed after user confirmation.
+
+Information to gather:
+- Available ingredients/products
+- Cuisine preferences (optional)
+- Dietary restrictions or preferences
+- Cooking skill level (optional)
+- Desired meal type (breakfast, lunch, dinner, snack, drink)
 
 Recipe format:
 - Creative funny name for the dish
-- List of surprising ingredient combinations  
+- List of surprising ingredient combinations
 - Simple step-by-step instructions
 - Expected funny/surprising result description
 """
@@ -308,9 +324,19 @@ Quick vibe check: Are you more of a "comfort food explorer" or "blow-my-mind adv
 And cooking confidence level - kitchen ninja or cautious experimenter? 🥷👨‍🍳
 ```
 
-**4. Recipe Generation with Historical Context**
+**4. Pre-flight Check & Confirmation**
 ```
-User: Adventurous, love Middle Eastern flavors, pretty confident in kitchen
+Bot: Alright, let's double-check our magical pantry. So far we have:
+- **Ingredients:** Chicken, dark chocolate, paprika, cumin, cinnamon.
+- **Vibe:** Adventurous dinner with Middle Eastern flavors.
+- **Chef Level:** Confident kitchen ninja! 🥷
+
+Does that look right? Should we add or change anything before I fire up the culinary forge?
+```
+
+**5. Recipe Generation with Historical Context**
+```
+User: Looks perfect, let's do it!
 Bot: BRILLIANT! 🌅 I'm channeling ancient Silk Road vibes with a modern twist...
 
 # Sultani Chocolate Chicken (Ottoman-Inspired) 🏺✨
@@ -333,7 +359,7 @@ Bot: BRILLIANT! 🌅 I'm channeling ancient Silk Road vibes with a modern twist.
 **Result:** A dish that tastes like a sunset over Constantinople - rich, mysterious, and surprisingly harmonious! The chocolate becomes earthy, not sweet.
 ```
 
-**5. Proactive Humorous Variations (Wrap-up)**
+**6. Proactive Humorous Variations (Wrap-up)**
 ```
 Bot: Plot twist time! 🎭 Want to shake things up even more?
 
@@ -436,7 +462,7 @@ LLM_TEMPERATURE=0.8
 LLM_MAX_TOKENS=1000
 
 # Bot Behavior
-MAX_CONTEXT_MESSAGES=20
+MAX_CONTEXT_MESSAGES=30
 
 # Logging
 LOG_LEVEL=INFO
@@ -466,57 +492,3 @@ if not all(required_vars):
 
 **Local Development Flow:**
 1. Copy `.env.example` to `.env`
-2. Fill in all configuration values (no defaults in code)
-3. Run `make run` - configuration loaded automatically
-4. Change `.env` and restart container for updates
-
-**Example .env.example template:**
-```bash
-# .env.example - template for developers
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
-OPENROUTER_API_KEY=your_openrouter_api_key_here
-OPENROUTER_MODEL=anthropic/claude-3.5-haiku
-LLM_TEMPERATURE=0.8
-LLM_MAX_TOKENS=1000
-MAX_CONTEXT_MESSAGES=20
-LOG_LEVEL=INFO
-```
-
-## Logging Approach
-
-**Principle:** Simple Python logging - INFO by default, DEBUG only when debugging
-
-**Logging Setup:**
-```python
-# main.py - configure logging at startup
-import logging
-from logging.handlers import RotatingFileHandler
-import os
-
-def setup_logging():
-    os.makedirs("logs", exist_ok=True)
-    
-    logging.basicConfig(
-        level=LOG_LEVEL,  # INFO by default, DEBUG when needed
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            RotatingFileHandler("logs/recipe_bot.log", maxBytes=10*1024*1024, backupCount=3),
-            logging.StreamHandler()  # Console for Docker logs
-        ]
-    )
-```
-
-**What We Log:**
-- **INFO**: User interactions, successful recipe generations, LLM metrics
-- **DEBUG**: Detailed conversation flow (only when LOG_LEVEL=DEBUG in .env)
-
-**Log Management:**
-- Rotate at 10MB, keep 3 backups
-- Persist in Docker volume: `./logs:/app/logs`
-- View with `make logs` or `tail -f logs/recipe_bot.log`
-
----
-
-**Technical Vision Complete!** 🎉
-
-*This document serves as the foundation for developing the Funny Recipe Bot following KISS principles and MVP mindset. All sections designed for rapid implementation and testing.*

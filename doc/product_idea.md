@@ -10,14 +10,17 @@ LLM assistant in the form of a Telegram bot for generating and proposing funny r
 1. Processing user questions about recipe preferences
 2. Clarifying user needs regarding available products and ingredients
 3. Collecting and structuring key information about user preferences
+4. Detect the language of the user and answer in the language of the user (English, Russian, Dutch, or French)
+5. Save user needs and user preferences into conversation context so bot can support conversation up to 30 iteractions. At the end of 30 interactions, get back to fine tune user needs.
 
 ### Clarify User Preferences
-4. Conducting dialogue through Telegram bot based on LLM
-5. Personalizing recipe responses based on user context
+6. Conducting dialogue through Telegram bot based on LLM
+7. Personalizing recipe responses based on user context
+8. Summarizing collected preferences and asking for final confirmation before generating a recipe
 
 ### Recipe Creation
-6. Getting first few recipe options from web or preferred sources based on clarified user preferences
-7. Generating surprising simplified recipes for funny culinary experiments
+9. Getting first few recipe options from web or preferred sources based on clarified user preferences
+10. Generating surprising simplified recipes for funny culinary experiments
 
 ## Technical Implementation
 
@@ -50,6 +53,7 @@ Rules:
 - Keep recipes simple and easy to follow
 - Make the experience entertaining and fun
 - If you don't have specific ingredient information, ask for clarification
+- Before generating a recipe, summarize all gathered information (ingredients, preferences, mood) and ask for confirmation. Only proceed after user confirmation.
 
 Information to gather:
 - Available ingredients/products
