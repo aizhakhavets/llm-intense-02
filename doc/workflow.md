@@ -20,7 +20,9 @@
   - Functional approach, no OOP
   - Simple functions by domains
   - Minimal dependencies
-- Test immediately after each step
+- Test immediately after each step:
+  - All tests must be stored in the `/tests/` directory.
+  - All tests must be runnable (`pytest` or `make test`) and passing after every change.
 
 ### 3. Report & Update
 - Update @tasklist.md:
@@ -60,6 +62,7 @@ Plan → Propose → Confirm → Implement → Test → Report → Commit → Co
 - ❌ Add "future" functionality
 - ❌ Use complex architecture
 - ❌ Move to next iteration without approval
+- ❌ Commit code that breaks existing tests
 
 ## Files to Track
 
