@@ -1,7 +1,8 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+if os.getenv("ENV") != "production":
+    load_dotenv()
 
 # Telegram Bot
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -18,4 +19,4 @@ MAX_CONTEXT_MESSAGES = int(os.getenv("MAX_CONTEXT_MESSAGES", "30"))
 # Validate required settings
 required_vars = [TELEGRAM_BOT_TOKEN, OPENROUTER_API_KEY]
 if not all(required_vars):
-    raise ValueError("Missing required environment variables in .env file!")
+    raise ValueError("Missing required environment variables! Make sure they are set in your environment or .env file.")
