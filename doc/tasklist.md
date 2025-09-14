@@ -77,6 +77,50 @@
   - [x] If the user provides changes, the conversation should continue to refine preferences.
 - [x] Test: A full conversation flow where the bot summarizes preferences, user confirms, and recipe is generated.
 
+### Iteration 17: Conversational Flow & Language Consistency Fix ✅
+**Goal:** Fix mixed-language responses and ensure the bot asks questions one-by-one to create a more natural, engaging conversation.
+**Test:** Bot consistently responds in a single language and asks clarifying questions individually.
+**Completed:** September 14, 2025
+
+- [x] Enhance system prompt in `llm_client.py` for stricter language control.
+  - [x] Add explicit rules to *never* mix languages in a single response.
+  - [x] Reinforce that the bot must *always* reply in the language the user last used.
+- [x] Update system prompt in `llm_client.py` to enforce a one-question-at-a-time conversational flow.
+  - [x] Add instructions to break down information gathering into a friendly, step-by-step dialogue.
+  - [x] Emphasize acknowledging the user's previous message before asking the next question.
+- [x] Test:
+  - [x] Switch to Russian and verify the bot responds *only* in Russian for the entire conversation.
+  - [x] Start a new conversation and confirm the bot asks for ingredients, preferences, etc., in separate messages.
+
+### Iteration 18: Contextual Summaries in Every Message ✅
+**Goal:** Fix conversation context loss by including a summary of collected information in every bot message.
+**Test:** The bot maintains context throughout the conversation by summarizing known facts, and asks for recipe confirmation when enough information is gathered.
+**Completed:** September 14, 2025
+
+- [x] Update system prompt in `llm_client.py` to enforce a new conversational flow.
+  - [x] Add a rule: In every response, first acknowledge the user's message, then provide a bulleted list summarizing all gathered information (e.g., ingredients, preferences, mood).
+  - [x] Add a rule: When the summary contains 4 or more items, ask the user for confirmation to generate the recipe or add more details.
+  - [x] Reinforce the rule to generate a recipe only after explicit user confirmation.
+- [x] Test:
+  - [x] Start a new conversation and provide 2-3 pieces of information. Verify each bot response contains an updated summary.
+  - [x] Provide a 4th piece of information. Verify the bot asks for confirmation to proceed.
+  - [x] Confirm, and verify a recipe is generated.
+  - [x] In a separate test, ask to add more details and verify the conversation continues.
+
+### Iteration 19: Enhance System Prompt with Jokes, Mandatory Info, and Storytelling ✅
+**Goal:** Update the system prompt to make the bot more engaging and gather necessary information consistently.
+**Test:** The bot includes a joke in its messages, always asks for user location and cooking level, and uses storytelling in recipes.
+**Completed:** September 14, 2025
+
+- [x] Update system prompt in `llm_client.py` with new rules:
+  - [x] Add rule: Include a joke in each message, playing with ingredients, mood, or context.
+  - [x] Add rule: Make asking for user location and cooking level a mandatory step in information gathering.
+  - [x] Add rule: Use historical, legendary, or fairy tale references in the final recipe description.
+- [x] Test:
+  - [x] Start a new conversation and verify the bot tells a joke.
+  - [x] Verify the bot asks for location and cooking level before generating a recipe.
+  - [x] Generate a recipe and check for storytelling elements in the description.
+
 ---
 
 ## Iterative Development Plan
