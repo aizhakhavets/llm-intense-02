@@ -1,8 +1,0 @@
-warning: in the working copy of 'doc/tasklist.md', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'llm_client.py', LF will be replaced by CRLF the next time Git touches it
-Dockerfile
-__pycache__/handlers.cpython-313.pyc
-__pycache__/llm_client.cpython-313.pyc
-doc/tasklist.md
-handlers.py
-llm_client.py

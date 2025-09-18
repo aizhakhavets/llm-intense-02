@@ -1,4 +1,6 @@
+audio_processor
 config
 handlers
+image_processor
 llm_client
 main

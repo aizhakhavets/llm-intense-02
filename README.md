@@ -9,7 +9,10 @@ Creates funny culinary experiments by combining your ingredients in impossible-b
 ## ✨ Key Features
 
 - 🤖 **Conversational Intelligence** - Natural step-by-step ingredient gathering with context awareness
-- 🍳 **Cultural Recipe Generation** - LLM-powered recipes with historical background stories  
+- 🍳 **Cultural Recipe Generation** - LLM-powered recipes with historical background stories
+- 📸 **Photo Ingredient Recognition** - Identify ingredients from your photos.
+- 🎤 **Voice Message Transcription** - Talk to the bot with your ingredient lists.
+- 💾 **Persistent User Profiles** - Remembers your preferences across conversations.
 - 🌍 **Local Ingredient Surprise** - Automatic selection of regional ingredients (15 countries supported)
 - 😄 **Humor & Personality** - Joyful responses with cultural commentary and witty variations
 - 🔄 **Quality Assurance** - Automatic surprise verification and recipe enhancement (up to 3 attempts)
@@ -20,15 +23,16 @@ Creates funny culinary experiments by combining your ingredients in impossible-b
 
 ### Prerequisites
 - Docker and Docker Compose
-- [Telegram Bot Token](https://t.me/botfather) from @BotFather  
+- [Telegram Bot Token](https://t.me/botfather) from @BotFather
 - [OpenRouter API Key](https://openrouter.ai/) for LLM access
+- [OpenAI API Key](https://platform.openai.com/api-keys) for audio transcription
 
 ### 1-Minute Setup
 
 ```bash
 # 1. Clone repository
 git clone <repository-url>
-cd llm-intense-01
+cd llm-intense-02
 
 # 2. Configure environment
 cp .env.example .env
@@ -45,18 +49,26 @@ make logs
 
 Create `.env` file with your credentials:
 ```bash
-# Required - Get from @BotFather and OpenRouter
+# Required - Get from @BotFather, OpenRouter, and OpenAI
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 OPENROUTER_API_KEY=your_openrouter_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
 
 # Optional - Sensible defaults provided
 OPENROUTER_MODEL=anthropic/claude-3.5-haiku
+OPENROUTER_VISION_MODEL=google/gemini-pro-vision
 LLM_TEMPERATURE=0.8
-LLM_MAX_TOKENS=1000
-MAX_CONTEXT_MESSAGES=20
+LLM_MAX_TOKENS=10000
+MAX_CONTEXT_MESSAGES=30
 ```
 
 ## 🎭 How It Works
+
+### How to Use
+- **Start a conversation**: Use the `/start` command.
+- **Text**: Simply chat with the bot and tell it what ingredients you have.
+- **Photo**: Send a photo of your ingredients, and the bot will identify them for you. Use `/photo_help` for tips.
+- **Voice**: Send a voice message listing your ingredients.
 
 ### User Experience Flow
 ```
@@ -75,91 +87,62 @@ MAX_CONTEXT_MESSAGES=20
 
 ### Technical Architecture
 ```
-Telegram → handlers.py → llm_client.py → OpenRouter (Claude 3.5 Haiku)
-    ↑         ↓             ↓                    ↓
-   User   State Mgmt   Local Intel        Recipe Generation
-          + Memory    + Cultural           + Surprise Scoring
-                      Context             + Enhancement
+Telegram → handlers.py → llm_client.py   → OpenRouter
+              ↑ ↓           (LLM & Vision)
+              ↑ ↓
+   (User) → database.py   → audio_processor.py → OpenAI (Whisper)
+           (User Profiles
+         & Conv. History)
 ```
-
-### Smart Recipe Generation
-1. **Ingredient Intelligence**: Parses user ingredients + selects local surprises
-2. **Cultural Context**: Integrates historical cooking traditions 
-3. **Surprise Verification**: Ensures recipes score >0.5 surprise factor + humor
-4. **Auto-Enhancement**: Improves failed recipes with targeted hints
-5. **Proactive Variations**: Offers 2-3 humorous regional adaptations
 
 ## 🏗️ Architecture
 
 ### Technology Stack
-- **Runtime**: Python 3.13 + functional programming (no OOP)
+- **Runtime**: Python 3.13
 - **Bot Framework**: aiogram 3.x (async Telegram API)
-- **LLM Provider**: OpenRouter API (Claude 3.5 Haiku - fast & cost-effective)
+- **LLM Provider**: OpenRouter API (Claude 3.5 Haiku, etc.)
 - **Deployment**: Docker + Docker Compose (single container)
 - **Dependencies**: uv (modern Python package manager)
-- **Storage**: In-memory (no database needed)
+- **Storage**: SQLite for user profiles and conversation history.
 
 ### Project Structure
 ```
-llm-intense-01/
-├── main.py                      # 🚀 Entry point & logging setup (40 lines)
-├── config.py                    # ⚙️ Environment management (25 lines)  
-├── handlers.py                  # 💬 Message processing & state (300 lines)
-├── llm_client.py               # 🧠 LLM integration & prompts (260 lines)
-├── ingredient_intelligence.py   # 🌍 Local ingredients (15 regions, 120 lines)
-├── surprise_verification.py    # ✅ Quality assurance (310 lines)
-├── docker-compose.yml          # 🐳 Deployment config
-├── Dockerfile                  # 📦 Container definition
-├── Makefile                    # 🔧 Automation (run, stop, logs, build)
-├── logs/                       # 📝 Rotating logs (Docker volume)
-└── doc/
-    ├── documentation.md         # 📚 Complete technical docs
-    ├── vision.md               # 🎯 Architecture & principles
-    └── product_idea.md         # 💡 Product requirements
+llm-intense-02/
+├── main.py               # 🚀 Entry point & bot startup
+├── config.py             # ⚙️ Environment variable management
+├── handlers.py           # 💬 Message routing & core bot logic
+├── llm_client.py         # 🧠 LLM chat integration
+├── image_processor.py    # 🖼️ Image analysis (Vision API)
+├── audio_processor.py    # 🎤 Audio transcription (Whisper API)
+├── database.py           # 🗄️ SQLite database operations
+├── docker-compose.yml    # 🐳 Deployment configuration
+├── Dockerfile            # 📦 Container definition
+├── Makefile              # 🔧 Automation (run, stop, logs)
+└── logs/                 # 📝 Log files
 ```
 
 ### Core Modules
 
-| Module | Purpose | Key Features |
-|--------|---------|-------------|
-| `handlers.py` | Message routing & conversation management | State machine, context extraction, memory management |
-| `llm_client.py` | LLM integration & dynamic prompts | Cultural context, conversation vs recipe modes |
-| `ingredient_intelligence.py` | Local ingredient selection | 15-country database, cultural storytelling |
-| `surprise_verification.py` | Recipe quality assurance | Surprise scoring, humor detection, enhancement |
+| Module | Purpose |
+|--------|---------|
+| `handlers.py` | Handles incoming Telegram messages (text, photo, voice) and manages conversation flow. |
+| `llm_client.py` | Generates text responses using a Large Language Model. |
+| `image_processor.py` | Identifies ingredients from user-sent photos using a Vision model. |
+| `audio_processor.py` | Transcribes voice messages into text. |
+| `database.py` | Manages storing and retrieving user data and conversation history from an SQLite database. |
 
-## 🎪 Supported Regions
+## 🛠️ Bot Management Commands
 
-**15 Culinary Regions with Local Ingredients & Cultural Context**:
+A set of convenient commands are available to manage the bot's lifecycle. You can use either `make` (on Linux/macOS) or the `run.ps1` script (on Windows with PowerShell).
 
-🇮🇹 **Italy**: Parmigiano-reggiano, balsamic vinegar, prosciutto → *"Ancient Roman spice routes meet Renaissance creativity"*
-
-🇲🇽 **Mexico**: Lime, cilantro, jalapeños, avocado → *"Aztec traditions meet Spanish conquistador influences"*
-
-🇯🇵 **Japan**: Miso paste, nori, mirin, sesame oil → *"Zen Buddhist simplicity meets samurai precision"*
-
-🇫🇷 **France**: Butter, thyme, shallots, crème fraîche → *"Medieval guild techniques refined by royal chefs"*
-
-🇮🇳 **India**: Curry leaves, tamarind, cumin, coconut → *"Silk Road spices meet Mughal imperial kitchens"*
-
-*+ 10 more regions (Thailand, Greece, Morocco, China, Spain, Lebanon, Peru, Korea, Turkey, Brazil)*
-
-## 🛠️ Management Commands
-
-```bash
-# Deployment
-make build    # Build and start bot
-make run      # Start with existing image  
-make stop     # Stop bot
-make clean    # Complete cleanup
-
-# Monitoring  
-make logs     # Real-time log streaming
-tail -f logs/recipe_bot.log    # Direct log access
-
-# Development
-docker-compose up --build -d   # Manual build
-docker-compose logs -f recipe-bot  # Manual logs
-```
+| Command           | Makefile      | PowerShell        | Description                                                                 |
+|-------------------|---------------|-------------------|-----------------------------------------------------------------------------|
+| **Build & Start** | `make build`  | `.\run.ps1 build` | Builds the Docker image (if needed) and starts the bot in detached mode.    |
+| **Start**         | `make run`    | `.\run.ps1 run`   | Starts the bot using the existing image.                                    |
+| **Stop**          | `make stop`   | `.\run.ps1 stop`  | Stops and removes the bot's container.                                      |
+| **View Logs**     | `make logs`   | `.\run.ps1 logs`  | Streams the live logs from the bot container.                               |
+| **Full Cleanup**  | `make clean`  | `.\run.ps1 clean` | Stops the bot, removes the container, and deletes the log volume.           |
+| **Direct Logs**   | `tail -f logs/recipe_bot.log` | `Get-Content -Path logs\recipe_bot.log -Wait` | Directly monitor the log file on the host machine. |
 
 ## 📊 Monitoring & Performance
 

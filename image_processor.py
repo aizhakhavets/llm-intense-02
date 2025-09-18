@@ -7,7 +7,12 @@ from PIL import Image
 
 from config import OPENROUTER_API_KEY, OPENROUTER_VISION_MODEL
 
-async def identify_ingredients_from_photo(image_data: bytes) -> list[str]:
+client = openai.AsyncClient(
+    api_key=OPENROUTER_API_KEY,
+    base_url="https://openrouter.ai/api/v1"
+)
+
+async def identify_ingredients_from_photo(chat_id: int, image_data: bytes) -> list[str]:
     """
     Identifies ingredients from a given photo using a vision model.
     Resizes the image for performance and encodes it to base64.
@@ -26,10 +31,6 @@ async def identify_ingredients_from_photo(image_data: bytes) -> list[str]:
         # Encode to base64
         base64_image = base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-        client = openai.AsyncClient(
-            api_key=OPENROUTER_API_KEY,
-            base_url="https://openrouter.ai/api/v1"
-        )
         
         response = await client.chat.completions.create(
             model=OPENROUTER_VISION_MODEL,
@@ -54,7 +55,7 @@ async def identify_ingredients_from_photo(image_data: bytes) -> list[str]:
         )
         
         content = response.choices[0].message.content.strip()
-        logging.info(f"Vision API identified ingredients: {content}")
+        logging.info(f"Vision API identified ingredients for chat_id={chat_id}: {content}")
 
         if not content or "no ingredients found" in content.lower():
             return []
@@ -64,5 +65,5 @@ async def identify_ingredients_from_photo(image_data: bytes) -> list[str]:
         return ingredients
 
     except Exception as e:
-        logging.error(f"Error identifying ingredients from photo: {e}")
+        logging.error(f"Error identifying ingredients from photo for chat_id={chat_id}: {e}")
         return ["Error: Could not analyze the image."]

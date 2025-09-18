@@ -4,11 +4,13 @@ version = "0.1.0"
 dependencies = [
     "aiogram>=3.0.0",
     "python-dotenv>=1.0.0",
-    "openai>=1.0.0"
+    "openai>=1.0.0",
+    "Pillow>=10.0.0",
+    "pydub>=0.25.0"
 ]
 
 [tool.setuptools]
-py-modules = ["main", "config", "handlers", "llm_client"]
+py-modules = ["main", "config", "handlers", "llm_client", "image_processor", "audio_processor"]
 
 [tool.uv]
 dev-dependencies = [

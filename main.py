@@ -5,6 +5,7 @@ from logging.handlers import RotatingFileHandler
 from aiogram import Bot, Dispatcher
 from config import TELEGRAM_BOT_TOKEN
 from handlers import router
+from database import init_db
 
 def setup_logging():
     """Setup logging with rotating file handler and console output for Docker"""
@@ -26,6 +27,8 @@ def setup_logging():
 async def main():
     setup_logging()
     logging.info("Starting Funny Recipe Bot...")
+    
+    init_db()
     
     bot = Bot(token=TELEGRAM_BOT_TOKEN)
     dp = Dispatcher()
